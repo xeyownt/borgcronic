@@ -1,5 +1,16 @@
 #! /bin/bash
 
+# Common settings
+BASE=borgcronic
+LOGFILE=/var/log/$BASE
+CONF=/etc/$BASE.conf
+LOGROTATE=/etc/logrotate.d/$BASE
+LOCK=/var/lock/$BASE
+LOCKPID=/var/lock/$BASE/pid
+
+# Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
+export BORG_CACHE_DIR=/var/cache/borg
+
 die()
 {
     CODE=$1
@@ -8,12 +19,12 @@ die()
     exit $CODE
 }
 
-sizeof() 
+sizeof()
 {
     du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
 }
 
-timeit() 
+timeit()
 {
     echo "============================================================================="
     echo "### $@"
@@ -72,99 +83,132 @@ print_size_summary()
     echo "Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
+check_root()
+{
+    # Must be root
+    if [ $(whoami) != "root" ]; then
+        die 1 "Run this script as root or sudo"
+    fi
+}
+
+read_conf()
+{
+    REPOSITORY=
+    DIRS=
+    EXCLUDES=
+    BORG=borg
+    STAT=
+    VERBOSE=
+    [ -e $CONF ] || die 1 "'$CONF' not found."
+    . $CONF
+
+    [ -n "$REPOSITORY" ] || die 1 "REPOSITORY not defined or empty."
+    [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty."
+    [ -d "$REPOSITORY" ] || die 1 "'$REPOSITORY' not found."
+}
+
+read_options()
+{
+    # Parse options
+    VERBOSE=$((VERBOSE+0))
+    while getopts "dsv" flag; do
+        case "$flag" in
+            d)
+                BORG="echo $BORG" ;;
+            s)
+                STAT=true ;;
+            v)
+                VERBOSE=$((VERBOSE+1)) ;;
+            *)
+                echo "Usage: $BASE.sh [-dsv]"
+                exit 1
+                ;;
+        esac
+    done
+    shift $((OPTIND-1))
+}
+
+print_log_header()
+{
+    echo "#############################################################################"
+    echo "Start: $(date)"
+    print_size_summary
+}
+
+print_log_footer()
+{
+    echo "============================================================================="
+    echo "End: $(date)"
+    print_size_summary
+}
+
+print_dirs_stats()
+{
+    if [ -n "$STAT" ]; then
+        DIRS_SZ=$(sizeof $DIRS)
+        DIRS_ND=$(find $DIRS -type d|wc -l)
+        DIRS_NF=$(find $DIRS -type f|wc -l)
+        echo "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
+    fi
+}
+
+start_logging()
+{
+    [ -d $(dirname $LOGFILE) ] || mkdir -p $(dirname $LOGFILE)
+    if [ $VERBOSE -ge 1 ]; then
+        exec > >(tee -a $LOGFILE ) 2>&1
+    else
+        exec >> $LOGFILE 2>&1
+    fi
+}
+
+borg_init()
+{
+    echo "Init borg repository $REPOSITORY"
+    timeit $BORG init -e none $REPOSITORY
+}
+
+borg_create()
+{
+    timeit $BORG create -v --stats -x --compression lz4  \
+        $REPOSITORY::'{hostname}-{now:%Y-%m-%d_%H%M}'    \
+        $DIRS                                            \
+        $EXCLUDES
+}
+
+borg_prune()
+{
+    # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
+    # archives of THIS machine. The '{hostname}-' prefix is very important to
+    # limit prune's operation to this machine's archives and not apply to
+    # other machine's archives also.
+    timeit $BORG prune -v --list                         \
+        $REPOSITORY --prefix '{hostname}-'               \
+        --keep-daily=7 --keep-weekly=4 --keep-monthly=6
+}
+
 # Must be root
-if [ $(whoami) != "root" ]; then
-    die 1 "Run this script as root or sudo"
-fi
+check_root
 
-# Common settings
-BASE=borgcronic
-LOGFILE=/var/log/$BASE
-CONF=/etc/$BASE.conf
-LOGROTATE=/etc/logrotate.d/$BASE
-
-# Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
-export BORG_CACHE_DIR=/var/cache/borg
-
-# Create logrotate script if not present
+# Create logrotate script and config if not present
 install_logrotate
 install_conf
 
-# Read configuration
-REPOSITORY=
-DIRS=
-EXCLUDES=
-BORG=borg
-STAT=
-VERBOSE=
-[ -e $CONF ] || die 1 "'$CONF' not found."
-. $CONF
+# Read configuration and CLI options
+read_conf
+read_options "$@"
 
-[ -n "$REPOSITORY" ] || die 1 "REPOSITORY not defined or empty."
-[ -n "$DIRS" ]       || die 1 "DIRS not defined or empty."
-[ -d "$REPOSITORY" ] || die 1 "'$REPOSITORY' not found."
+# Start logging and print a few statistics
+start_logging
+print_log_header
+print_dirs_stats
 
-# Parse options
-VERBOSE=$((VERBOSE+0))
-while getopts "dsv" flag; do
-    case "$flag" in
-        d)
-            BORG="echo $BORG" ;;
-        s)
-            STAT=true ;;
-        v)
-            VERBOSE=$((VERBOSE+1)) ;;
-        *)
-            echo "Usage: $BASE.sh [-dsv]"
-            exit 1
-            ;;
-    esac
-done
-shift $((OPTIND-1))
-
-# Start...
-[ -d $(dirname $LOGFILE) ] || mkdir -p $(dirname $LOGFILE)
-if [ $VERBOSE -ge 1 ]; then
-    exec > >(tee -a $LOGFILE ) 2>&1
-else
-    exec >> $LOGFILE 2>&1
-fi
-
-echo "#############################################################################"
-echo "Start: $(date)"
-print_size_summary
-
-if [ $VERBOSE -ge 2 ]; then
-    echo "============================================================================="
-    echo "CONF:"
-    cat $CONF
-fi
-
+# Do the backup
 if ! [ -d $BORG_CACHE_DIR ]; then
-    echo "Init borg repository $REPOSITORY"
-    timeit $BORG init -e none $REPOSITORY
+    borg_init
 fi
+borg_create
+borg_prune
 
-if [ -n "$STAT" ]; then
-    DIRS_SZ=$(sizeof $DIRS)
-    DIRS_ND=$(find $DIRS -type d|wc -l)
-    DIRS_NF=$(find $DIRS -type f|wc -l)
-    echo "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
-fi
-
-timeit $BORG create -v --stats -x --compression lz4   \
-    $REPOSITORY::'{hostname}-{now:%Y-%m-%d_%H%M}'    \
-    $DIRS                                            \
-    $EXCLUDES
-
-# Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-# archives of THIS machine. The '{hostname}-' prefix is very important to
-# limit prune's operation to this machine's archives and not apply to
-# other machine's archives also.
-timeit $BORG prune -v --list                          \
-    $REPOSITORY --prefix '{hostname}-'               \
-    --keep-daily=7 --keep-weekly=4 --keep-monthly=6
-
-echo "============================================================================="
-echo "End: $(date)"
-print_size_summary
+# End logging
+print_log_footer
