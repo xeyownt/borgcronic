@@ -69,7 +69,7 @@ __END__
 print_size_summary()
 {
     echo "Borg repo: $(sizeof $REPOSITORY)"
-    echo "Borg cache: $(sizeof $CACHEDIR)"
+    echo "Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
 # Must be root
@@ -78,11 +78,13 @@ if [ $(whoami) != "root" ]; then
 fi
 
 # Common settings
-BASE=borg_cron
-CACHEDIR=~/.cache/borg
+BASE=borgcronic
 LOGFILE=/var/log/$BASE
 CONF=/etc/$BASE.conf
 LOGROTATE=/etc/logrotate.d/$BASE
+
+# Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
+export BORG_CACHE_DIR=/var/cache/borg
 
 # Create logrotate script if not present
 install_logrotate
@@ -92,6 +94,7 @@ install_conf
 REPOSITORY=
 DIRS=
 EXCLUDES=
+BORG=borg
 STAT=
 VERBOSE=
 [ -e $CONF ] || die 1 "'$CONF' not found."
@@ -103,14 +106,16 @@ VERBOSE=
 
 # Parse options
 VERBOSE=$((VERBOSE+0))
-while getopts "sv" flag; do
+while getopts "dsv" flag; do
     case "$flag" in
+        d)
+            BORG="echo $BORG" ;;
         s)
             STAT=true ;;
         v)
             VERBOSE=$((VERBOSE+1)) ;;
         *)
-            echo "Usage: $BASE.sh [-sv]"
+            echo "Usage: $BASE.sh [-dsv]"
             exit 1
             ;;
     esac
@@ -135,9 +140,9 @@ if [ $VERBOSE -ge 2 ]; then
     cat $CONF
 fi
 
-if ! [ -d $CACHEDIR ]; then
+if ! [ -d $BORG_CACHE_DIR ]; then
     echo "Init borg repository $REPOSITORY"
-    timeit borg init -e none $REPOSITORY
+    timeit $BORG init -e none $REPOSITORY
 fi
 
 if [ -n "$STAT" ]; then
@@ -147,7 +152,7 @@ if [ -n "$STAT" ]; then
     echo "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
 fi
 
-timeit borg create -v --stats -x --compression lz4   \
+timeit $BORG create -v --stats -x --compression lz4   \
     $REPOSITORY::'{hostname}-{now:%Y-%m-%d_%H%M}'    \
     $DIRS                                            \
     $EXCLUDES
@@ -156,7 +161,7 @@ timeit borg create -v --stats -x --compression lz4   \
 # archives of THIS machine. The '{hostname}-' prefix is very important to
 # limit prune's operation to this machine's archives and not apply to
 # other machine's archives also.
-timeit borg prune -v --list                          \
+timeit $BORG prune -v --list                          \
     $REPOSITORY --prefix '{hostname}-'               \
     --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 
