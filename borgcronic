@@ -1,0 +1,165 @@
+#! /bin/bash
+
+die()
+{
+    CODE=$1
+    shift
+    >&2 echo "ERROR -- $@"
+    exit $CODE
+}
+
+sizeof() 
+{
+    du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
+}
+
+timeit() 
+{
+    echo "============================================================================="
+    echo "### $@"
+    echo "-----------------------------------------------------------------------------"
+    time "$@"
+}
+
+install_logrotate()
+{
+    [ -e $LOGROTATE ] && return
+
+    if [ -d $(dirname $LOGROTATE) ]; then
+        >&2 echo "Installing logrotate file '$LOGROTATE'."
+        cat > $LOGROTATE <<- __END__
+/var/log/$BASE
+{
+    rotate 4
+    weekly
+    missingok
+    notifempty
+    compress
+    delaycompress
+}
+__END__
+        chmod 644 $LOGROTATE
+    else
+        >&2 echo "WARNING - $(dirname $LOGROTATE) not found. Can't install logrotate script."
+    fi
+}
+
+install_conf()
+{
+    [ -e $CONF ] && return
+
+    >&2 echo "Installing config file '$CONF'."
+    cat > $CONF <<- __END__
+## REPOSITORY - mandatory
+#REPOSITORY=username@remoteserver.com:backup
+
+## DIRS - mandatory
+DIRS='/home'
+
+## EXCLUDES - optional
+EXCLUDES='--exclude */.cache'
+EXCLUDES+=' --exclude *.nobak'
+EXCLUDES+=' --exclude */.cache'
+EXCLUDES+=' --exclude */xapiandb'
+EXCLUDES+=' --exclude */.thumbnails'
+__END__
+    chmod 644 $CONF
+}
+
+print_size_summary()
+{
+    echo "Borg repo: $(sizeof $REPOSITORY)"
+    echo "Borg cache: $(sizeof $CACHEDIR)"
+}
+
+# Must be root
+if [ $(whoami) != "root" ]; then
+    die 1 "Run this script as root or sudo"
+fi
+
+# Common settings
+BASE=borg_cron
+CACHEDIR=~/.cache/borg
+LOGFILE=/var/log/$BASE
+CONF=/etc/$BASE.conf
+LOGROTATE=/etc/logrotate.d/$BASE
+
+# Create logrotate script if not present
+install_logrotate
+install_conf
+
+# Read configuration
+REPOSITORY=
+DIRS=
+EXCLUDES=
+STAT=
+VERBOSE=
+[ -e $CONF ] || die 1 "'$CONF' not found."
+. $CONF
+
+[ -n "$REPOSITORY" ] || die 1 "REPOSITORY not defined or empty."
+[ -n "$DIRS" ]       || die 1 "DIRS not defined or empty."
+[ -d "$REPOSITORY" ] || die 1 "'$REPOSITORY' not found."
+
+# Parse options
+VERBOSE=$((VERBOSE+0))
+while getopts "sv" flag; do
+    case "$flag" in
+        s)
+            STAT=true ;;
+        v)
+            VERBOSE=$((VERBOSE+1)) ;;
+        *)
+            echo "Usage: $BASE.sh [-sv]"
+            exit 1
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+# Start...
+[ -d $(dirname $LOGFILE) ] || mkdir -p $(dirname $LOGFILE)
+if [ $VERBOSE -ge 1 ]; then
+    exec > >(tee -a $LOGFILE ) 2>&1
+else
+    exec >> $LOGFILE 2>&1
+fi
+
+echo "#############################################################################"
+echo "Start: $(date)"
+print_size_summary
+
+if [ $VERBOSE -ge 2 ]; then
+    echo "============================================================================="
+    echo "CONF:"
+    cat $CONF
+fi
+
+if ! [ -d $CACHEDIR ]; then
+    echo "Init borg repository $REPOSITORY"
+    timeit borg init -e none $REPOSITORY
+fi
+
+if [ -n "$STAT" ]; then
+    DIRS_SZ=$(sizeof $DIRS)
+    DIRS_ND=$(find $DIRS -type d|wc -l)
+    DIRS_NF=$(find $DIRS -type f|wc -l)
+    echo "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
+fi
+
+timeit borg create -v --stats -x --compression lz4   \
+    $REPOSITORY::'{hostname}-{now:%Y-%m-%d_%H%M}'    \
+    $DIRS                                            \
+    $EXCLUDES
+
+# Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
+# archives of THIS machine. The '{hostname}-' prefix is very important to
+# limit prune's operation to this machine's archives and not apply to
+# other machine's archives also.
+timeit borg prune -v --list                          \
+    $REPOSITORY --prefix '{hostname}-'               \
+    --keep-daily=7 --keep-weekly=4 --keep-monthly=6
+
+echo "============================================================================="
+echo "End: $(date)"
+print_size_summary
