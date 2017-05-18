@@ -5,8 +5,8 @@ BASE=borgcronic
 LOGFILE=/var/log/$BASE
 CONF=/etc/$BASE.conf
 LOGROTATE=/etc/logrotate.d/$BASE
-LOCK=/var/lock/$BASE
-LOCKPID=/var/lock/$BASE/pid
+LOCKDIR=/var/lock/$BASE
+PIDFILE=/var/lock/$BASE/pid
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
 export BORG_CACHE_DIR=/var/cache/borg
@@ -85,10 +85,7 @@ print_size_summary()
 
 check_root()
 {
-    # Must be root
-    if [ $(whoami) != "root" ]; then
-        die 1 "Run this script as root or sudo"
-    fi
+    [ $(whoami) == "root" ] || die 1 "Run this script as root or sudo"
 }
 
 read_conf()
@@ -187,8 +184,37 @@ borg_prune()
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 }
 
+LOCK_SLEEP=30               # (seconds) Delay to wait before getting lock again
+LOCK_MAXWAIT=86400          # (seconds) Maximum delay to wait before giving up getting the lock
+
+lock_get()
+{
+    while ! mkdir $LOCKDIR &> /dev/null; do
+        # Lock failed. Check if the other pid is alive
+        OTHERPID="$(cat "$PIDFILE")" || die 99 "lock failed, but cannot get other pid."
+
+        if ! kill -0 $OTHERPID &> /dev/null; then
+            # lock is stale, remove it and retry
+            rm -rf "$LOCKDIR"
+        else
+            die 99 "Lock failed, '$LOCKDIR' owned by pid $OTHERPID."
+        fi
+    done
+
+    echo $$ > $PIDFILE
+    trap 'trap - INT TERM EXIT; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
+}
+
+lock_exit()
+{
+    exit 0
+}
+
 # Must be root
 check_root
+
+# Get the lock
+lock_get
 
 # Create logrotate script and config if not present
 install_logrotate
@@ -212,3 +238,6 @@ borg_prune
 
 # End logging
 print_log_footer
+
+# Release the lock
+lock_exit
