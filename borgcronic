@@ -10,6 +10,7 @@ PIDFILE=/var/lock/$BASE/pid
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
 export BORG_CACHE_DIR=/var/cache/borg
+BORG_LASTSUCCESSFUL=$BORG_CACHE_DIR/$BASE.success
 
 die()
 {
@@ -159,6 +160,23 @@ start_logging()
     fi
 }
 
+TRY_WAIT=120               # (seconds) Delay to wait before trying again
+TRY_MAXWAIT=86400          # (seconds) Maximum delay to wait before giving up trying again
+
+tryborg()
+{
+    false;
+    until [ $? -eq 0 ]; do
+        # Wait for the repository to show up
+        while ! [ -f $REPOSITORY/README ]; do
+            sleep $TRY_WAIT
+        done
+        timeit $BORG "$@"
+    done
+
+    touch $BORG_LASTSUCCESSFUL.$1
+}
+
 borg_init()
 {
     echo "Init borg repository $REPOSITORY"
@@ -167,7 +185,7 @@ borg_init()
 
 borg_create()
 {
-    timeit $BORG create -v --stats -x --compression lz4  \
+    tryborg create -v --stats -x --compression lz4  \
         $REPOSITORY::'{hostname}-{now:%Y-%m-%d_%H%M}'    \
         $DIRS                                            \
         $EXCLUDES
@@ -179,13 +197,10 @@ borg_prune()
     # archives of THIS machine. The '{hostname}-' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    timeit $BORG prune -v --list                         \
+    tryborg prune -v --list                         \
         $REPOSITORY --prefix '{hostname}-'               \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 }
-
-LOCK_SLEEP=30               # (seconds) Delay to wait before getting lock again
-LOCK_MAXWAIT=86400          # (seconds) Maximum delay to wait before giving up getting the lock
 
 lock_get()
 {
