@@ -26,12 +26,12 @@ sizeof()
     du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
 }
 
-timeit()
+doit()
 {
     echo "============================================================================="
     echo "### $@"
     echo "-----------------------------------------------------------------------------"
-    time "$@"
+    "$@"
 }
 
 install_logrotate()
@@ -164,11 +164,17 @@ start_logging()
 syslog()
 {
     logger --id=$$ -t $base "$@"
+    echo "-----------------------------------------------------------------------------"
+    echo "$(date) $base[$$]:" "$@"
 }
 
 tryborg()
 {
+    local SEC_STARTING=0
+    local SEC_DOING=0
+
     syslog Starting "'$BORG $1'"
+    SEC_STARTING=$SECONDS
     while : ; do
         # Wait for the repository to show up
         while ! [ -f $REPOSITORY/README ]; do
@@ -177,7 +183,8 @@ tryborg()
 
         # Do action
         syslog Doing "'$BORG $1'"
-        timeit $BORG "$@"
+        SEC_DOING=$SECONDS
+        doit $BORG "$@"
 
         # Action successful - exit
         [ $? -eq 0 ] && break
@@ -188,13 +195,13 @@ tryborg()
     done
 
     touch $BORG_LASTSUCCESSFUL.$1
-    syslog Done "'$BORG $1'"
+    syslog Done "'$BORG $1'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
 }
 
 borg_init()
 {
     echo "Init borg repository $REPOSITORY"
-    timeit $BORG init -e none $REPOSITORY
+    doit $BORG init -e none $REPOSITORY
 }
 
 borg_create()
