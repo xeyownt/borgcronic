@@ -161,10 +161,10 @@ start_logging()
 }
 
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
-TRY_MAXWAIT=86400          # (seconds) Maximum delay to wait before giving up trying again
 
 tryborg()
 {
+    logger --id -t $base Starting "'$BORG $1'"
     false;
     until [ $? -eq 0 ]; do
         # Wait for the repository to show up
@@ -175,6 +175,7 @@ tryborg()
     done
 
     touch $BORG_LASTSUCCESSFUL.$1
+    logger --id -t $base Done "'$BORG $1'"
 }
 
 borg_init()
