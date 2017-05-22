@@ -160,11 +160,15 @@ start_logging()
     fi
 }
 
+syslog()
+{
+    logger --id=$$ -t $base "$@"
+}
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 
 tryborg()
 {
-    logger --id -t $base Starting "'$BORG $1'"
+    syslog Starting "'$BORG $1'"
     false;
     until [ $? -eq 0 ]; do
         # Wait for the repository to show up
@@ -175,7 +179,7 @@ tryborg()
     done
 
     touch $BORG_LASTSUCCESSFUL.$1
-    logger --id -t $base Done "'$BORG $1'"
+    syslog Done "'$BORG $1'"
 }
 
 borg_init()
