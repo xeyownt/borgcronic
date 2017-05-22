@@ -26,14 +26,6 @@ sizeof()
     du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
 }
 
-doit()
-{
-    echo "============================================================================="
-    echo "### $@"
-    echo "-----------------------------------------------------------------------------"
-    "$@"
-}
-
 install_logrotate()
 {
     [ -e $LOGROTATE ] && return
@@ -81,8 +73,8 @@ __END__
 
 print_size_summary()
 {
-    echo "Borg repo: $(sizeof $REPOSITORY)"
-    echo "Borg cache: $(sizeof $BORG_CACHE_DIR)"
+    echo "## Borg repo: $(sizeof $REPOSITORY)"
+    echo "## Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
 check_root()
@@ -130,15 +122,28 @@ read_options()
 print_log_header()
 {
     echo "#############################################################################"
-    echo "Start: $(date)"
+    echo "# $(date) -- Start $BASE[$$]"
     print_size_summary
 }
 
 print_log_footer()
 {
-    echo "============================================================================="
-    echo "End: $(date)"
+    echo "# $(date) -- End $BASE[$$]"
     print_size_summary
+}
+
+syslog()
+{
+    logger --id=$$ -t $BASE "$@"
+    echo "# $(date) -- $@"
+}
+
+doit()
+{
+    echo "# $(date) ## $@"
+    echo "============================================================================="
+    "$@"
+    echo "-----------------------------------------------------------------------------"
 }
 
 print_dirs_stats()
@@ -159,13 +164,6 @@ start_logging()
     else
         exec >> $LOGFILE 2>&1
     fi
-}
-
-syslog()
-{
-    logger --id=$$ -t $BASE "$@"
-    echo "-----------------------------------------------------------------------------"
-    echo "$(date) $BASE[$$]:" "$@"
 }
 
 tryborg()
