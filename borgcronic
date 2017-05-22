@@ -11,6 +11,8 @@ TRY_WAIT=120               # (seconds) Delay to wait before trying again
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
 export BORG_CACHE_DIR=/var/cache/borg
+export BORG_KEYS_DIR=/var/lib/borg/keys
+export BORG_SECURITY_DIR=/var/lib/borg/security
 BORG_LASTSUCCESSFUL=$BORG_CACHE_DIR/$BASE.success
 
 die()
