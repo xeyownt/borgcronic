@@ -163,9 +163,9 @@ start_logging()
 
 syslog()
 {
-    logger --id=$$ -t $base "$@"
+    logger --id=$$ -t $BASE "$@"
     echo "-----------------------------------------------------------------------------"
-    echo "$(date) $base[$$]:" "$@"
+    echo "$(date) $BASE[$$]:" "$@"
 }
 
 tryborg()
