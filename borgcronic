@@ -7,6 +7,7 @@ CONF=/etc/$BASE.conf
 LOGROTATE=/etc/logrotate.d/$BASE
 LOCKDIR=/var/lock/$BASE
 PIDFILE=/var/lock/$BASE/pid
+TRY_WAIT=120               # (seconds) Delay to wait before trying again
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
 export BORG_CACHE_DIR=/var/cache/borg
@@ -164,18 +165,26 @@ syslog()
 {
     logger --id=$$ -t $base "$@"
 }
-TRY_WAIT=120               # (seconds) Delay to wait before trying again
 
 tryborg()
 {
     syslog Starting "'$BORG $1'"
-    false;
-    until [ $? -eq 0 ]; do
+    while : ; do
         # Wait for the repository to show up
         while ! [ -f $REPOSITORY/README ]; do
             sleep $TRY_WAIT
         done
+
+        # Do action
+        syslog Doing "'$BORG $1'"
         timeit $BORG "$@"
+
+        # Action successful - exit
+        [ $? -eq 0 ] && break
+
+        # Action failed - Wait then retry
+        syslog Failed "'$BORG $1'"
+        sleep $TRY_WAIT
     done
 
     touch $BORG_LASTSUCCESSFUL.$1
