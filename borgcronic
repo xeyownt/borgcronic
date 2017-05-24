@@ -73,6 +73,19 @@ __END__
     chmod 644 $CONF
 }
 
+check_or_do_install()
+{
+    # Create logrotate script and config if requested
+    if [ -n "$INSTALL_REQ" ]; then
+        install_logrotate
+        install_conf
+        exit 0
+    fi
+
+    [ -e $LOGROTATE ] && [ -e $CONF ] && return
+    die 1 "'$LOGROTATE' or '$CONF' missing. Please first run '$BASE -i' to run install procedure."
+}
+
 print_size_summary()
 {
     echo "## Borg repo: $(sizeof $REPOSITORY)"
@@ -89,12 +102,12 @@ read_conf()
     REPOSITORY=
     DIRS=
     EXCLUDES=
-    BORG=borg
-    STAT=
-    VERBOSE=
     [ -e $CONF ] || die 1 "'$CONF' not found."
     . $CONF
+}
 
+check_conf()
+{
     [ -n "$REPOSITORY" ] || die 1 "REPOSITORY not defined or empty."
     [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty."
     [ -d "$REPOSITORY" ] || die 1 "'$REPOSITORY' not found."
@@ -103,17 +116,31 @@ read_conf()
 read_options()
 {
     # Parse options
-    VERBOSE=$((VERBOSE+0))
-    while getopts "dsv" flag; do
+    BORG=borg
+    BG="&"
+    VERBOSE=0
+    DIRS_STAT=
+    INSTALL_REQ=
+
+    while getopts "dfisv" flag; do
         case "$flag" in
             d)
+                # dry-run mode
                 BORG="echo $BORG" ;;
+            f)
+                # run in foreground
+                BG= ;;
+            i)
+                # install request
+                INSTALL_REQ=true ;;
             s)
-                STAT=true ;;
+                # Display DIRS statistics
+                DIRS_STAT=true ;;
             v)
+                # Verbose mode
                 VERBOSE=$((VERBOSE+1)) ;;
             *)
-                echo "Usage: $BASE.sh [-dsv]"
+                echo "Usage: $BASE.sh [-dfisv]"
                 exit 1
                 ;;
         esac
@@ -151,7 +178,7 @@ doit()
 
 print_dirs_stats()
 {
-    if [ -n "$STAT" ]; then
+    if [ -n "$DIRS_STAT" ]; then
         DIRS_SZ=$(sizeof $DIRS)
         DIRS_ND=$(find $DIRS -type d|wc -l)
         DIRS_NF=$(find $DIRS -type f|wc -l)
@@ -247,34 +274,45 @@ lock_exit()
     exit 0
 }
 
+main()
+{
+    # Get the lock
+    lock_get
+
+    # Start logging and print a few statistics
+    start_logging
+    print_log_header
+    print_dirs_stats
+
+    # Do the backup
+    if ! [ -d $BORG_CACHE_DIR ]; then
+        borg_init
+    fi
+    borg_create
+    borg_prune
+
+    # End logging
+    print_log_footer
+
+    # Release the lock
+    lock_exit
+}
+
 # Must be root
 check_root
 
-# Get the lock
-lock_get
-
-# Create logrotate script and config if not present
-install_logrotate
-install_conf
-
-# Read configuration and CLI options
-read_conf
+# Read CLI options
 read_options "$@"
 
-# Start logging and print a few statistics
-start_logging
-print_log_header
-print_dirs_stats
+# Check or perform install
+check_or_do_install
 
-# Do the backup
-if ! [ -d $BORG_CACHE_DIR ]; then
-    borg_init
-fi
-borg_create
-borg_prune
+# Read and check configuration
+read_conf
+check_conf
 
-# End logging
-print_log_footer
+# Run main process (in background by default)
+eval "main $BG"
 
-# Release the lock
-lock_exit
+
+
