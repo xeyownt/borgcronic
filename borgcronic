@@ -187,7 +187,7 @@ doit()
     "$@"
     log 0 "===================================================================================================="
     print_size_summary
-    # We must return exit status of "$@" !
+    # TODO: We must return exit status of "$@" !
 }
 
 print_dirs_stats()
