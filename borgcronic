@@ -15,12 +15,23 @@ export BORG_KEYS_DIR=/var/lib/borg/keys
 export BORG_SECURITY_DIR=/var/lib/borg/security
 BORG_LASTSUCCESSFUL=$BORG_CACHE_DIR/$BASE.success
 
+syslog()
+{
+    logger --id=$$ -t $BASE "$@"
+    echo "# $(date): $@"
+}
+
 die()
 {
     CODE=$1
     shift
-    >&2 echo "ERROR -- $@"
+    >&2 syslog "ERROR -- $@"
     exit $CODE
+}
+
+warning()
+{
+    >&2 syslog "WARNING -- $@"
 }
 
 sizeof()
@@ -47,7 +58,7 @@ check_or_install_logrotate()
 __END__
         chmod 644 $LOGROTATE
     else
-        >&2 echo "WARNING - $(dirname $LOGROTATE) not found. Can't install logrotate script."
+        warning "$(dirname $LOGROTATE) not found. Can't install logrotate script."
     fi
 }
 
@@ -146,12 +157,6 @@ print_log_header()
 print_log_footer()
 {
     echo "# $(date) -- End $BASE[$$]"
-}
-
-syslog()
-{
-    logger --id=$$ -t $BASE "$@"
-    echo "# $(date) -- $@"
 }
 
 doit()
