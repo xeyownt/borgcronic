@@ -57,8 +57,8 @@ install_conf()
 
     >&2 echo "Installing config file '$CONF'."
     cat > $CONF <<- __END__
-## REPOSITORY - mandatory
-#REPOSITORY=username@remoteserver.com:backup
+## BORG_REPO - mandatory
+#BORG_REPO=username@remoteserver.com:backup
 
 ## DIRS - mandatory
 DIRS='/home'
@@ -87,7 +87,7 @@ check_or_do_install()
 
 print_size_summary()
 {
-    echo "## Borg repo: $(sizeof $REPOSITORY)"
+    echo "## Borg repo: $(sizeof $BORG_REPO)"
     echo "## Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
@@ -98,50 +98,64 @@ check_root()
 
 read_conf()
 {
-    REPOSITORY=
+    BORG_REPO=
     DIRS=
     EXCLUDES=
     [ -e $CONF ] || die 1 "'$CONF' not found."
     . $CONF
+    export BORG_REPO
+    export BORG_CACHE_DIR
+    export BORG_KEYS_DIR
+    export BORG_SECURITY_DIR
 }
 
 check_conf()
 {
-    [ -n "$REPOSITORY" ] || die 1 "REPOSITORY not defined or empty."
+    [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty."
     [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty."
-    [ -d "$REPOSITORY" ] || die 1 "'$REPOSITORY' not found."
+    [ -d "$BORG_REPO" ] || die 1 "'$BORG_REPO' not found."
 }
 
 read_options()
 {
     # Parse options
-    BORG=borg
     VERBOSE=0
     DIRS_STAT=
     INSTALL_REQ=
+    EXEC=
+    DRYRUN=
 
-    local OPTIONS="disv"
+    local OPTIONS="disvx"
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
                 # dry-run mode
-                BORG="echo $BORG" ;;
+                DRYRUN=true
+                ;;
             i)
                 # install request
-                INSTALL_REQ=true ;;
+                INSTALL_REQ=true
+                ;;
             s)
                 # Display DIRS statistics
-                DIRS_STAT=true ;;
+                DIRS_STAT=true
+                ;;
             v)
                 # Verbose mode
-                VERBOSE=$((VERBOSE+1)) ;;
+                VERBOSE=$((VERBOSE+1))
+                ;;
+            x)
+                # Execute mode
+                EXEC=true
+                VERBOSE=1
+                break
+                ;;
             *)
                 echo "Usage: $BASE.sh [-$OPTIONS]"
                 exit 1
                 ;;
         esac
     done
-    shift $((OPTIND-1))
 }
 
 print_log_header()
@@ -197,42 +211,47 @@ tryborg()
     local SEC_STARTING=0
     local SEC_DOING=0
 
-    syslog Starting "'$BORG $1'"
+    syslog Starting "'borg $1'"
     SEC_STARTING=$SECONDS
     while : ; do
         # Wait for the repository to show up
-        while ! [ -f $REPOSITORY/README ]; do
+        while ! [ -f $BORG_REPO/README ]; do
             sleep $TRY_WAIT
         done
 
         # Do action
-        syslog Doing "'$BORG $1'"
+        syslog Doing "'borg $1'"
         SEC_DOING=$SECONDS
-        doit $BORG "$@"
+        doit borg "$@"
 
         # Action successful - exit
         [ $? -eq 0 ] && break
 
         # Action failed - Wait then retry
-        syslog Failed "'$BORG $1'"
+        syslog Failed "'borg $1'"
         sleep $TRY_WAIT
     done
 
     touch $BORG_LASTSUCCESSFUL.$1
-    syslog Done "'$BORG $1'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
+    syslog Done "'borg $1'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
+}
+
+borg_exec()
+{
+    tryborg ${DRYRUN:+--dry-run} "$@"
 }
 
 borg_init()
 {
-    echo "Init borg repository $REPOSITORY"
-    doit $BORG init -e none $REPOSITORY
+    echo "Init borg repository $BORG_REPO"
+    doit ${DRYRUN:+echo} borg init -e none ::
 }
 
 borg_create()
 {
-    tryborg create -v --stats -x --compression lz4  \
-        $REPOSITORY::'{hostname}-{now:%Y-%m-%d_%H%M}'    \
-        $DIRS                                            \
+    tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
+        ::'{hostname}-{now:%Y-%m-%d_%H%M}'                              \
+        $DIRS                                                           \
         $EXCLUDES
 }
 
@@ -242,8 +261,8 @@ borg_prune()
     # archives of THIS machine. The '{hostname}-' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    tryborg prune -v --list                         \
-        $REPOSITORY --prefix '{hostname}-'               \
+    tryborg prune ${DRYRUN:+--dry-run} -v --list \
+        :: --prefix '{hostname}-'                \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 }
 
@@ -255,7 +274,7 @@ lock_get()
 
         if ! kill -0 $OTHERPID &> /dev/null; then
             # lock is stale, remove it and retry
-            rm -rf "$LOCKDIR"
+            rm -r "$LOCKDIR" || die 99 "lock failed, but cannot rm lockdir"
         else
             die 99 "Lock failed, '$LOCKDIR' owned by pid $OTHERPID."
         fi
@@ -280,12 +299,16 @@ main()
     print_log_header
     print_dirs_stats
 
-    # Do the backup
-    if ! [ -d $BORG_CACHE_DIR ]; then
-        borg_init
+    if [ -n "$EXEC" ]; then
+        borg_exec "$@"
+    else
+        # Do the backup
+        if ! [ -d $BORG_CACHE_DIR ]; then
+            borg_init
+        fi
+        borg_create
+        borg_prune
     fi
-    borg_create
-    borg_prune
 
     # End logging
     print_log_footer
@@ -299,6 +322,7 @@ check_root
 
 # Read CLI options
 read_options "$@"
+shift $((OPTIND-1))
 
 # Check or perform install
 check_or_do_install
