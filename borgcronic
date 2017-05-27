@@ -7,6 +7,7 @@ CONF=/etc/$BASE.conf
 LOGROTATE=/etc/logrotate.d/$BASE
 LOCKDIR=/var/lock/$BASE
 PIDFILE=/var/lock/$BASE/pid
+FIFOFILE=/var/run/$BASE.fifo
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
@@ -103,6 +104,11 @@ __END__
     chmod 644 $CONF
 }
 
+check_or_install_fifo()
+{
+    [ -e $FIFOFILE ] || mkfifo -m 600 $FIFOFILE
+}
+
 print_size_summary()
 {
     log 2 "Borg repo: $(sizeof $BORG_REPO)"
@@ -138,10 +144,15 @@ read_options()
     DIRS_STAT=
     EXEC=
     DRYRUN=
+    DAEMON=
 
-    local OPTIONS="dsvx"
+    local OPTIONS="Ddsvx"
     while getopts "$OPTIONS" flag; do
         case "$flag" in
+            D)
+                # DAEMON mode
+                DAEMON=true
+                ;;
             d)
                 # dry-run mode
                 DRYRUN=true
@@ -300,22 +311,36 @@ main()
 
     # Start logging and print a few statistics
     start_logging
-    print_log_header
-    print_dirs_stats
 
-    if [ -n "$EXEC" ]; then
-        borg_exec "$@"
-    else
-        # Do the backup
-        if ! [ -d $BORG_CACHE_DIR ]; then
-            borg_init
+    while : ; do
+        # If in daemon mode, we wait for wake-up (WUP) signal...
+        if [ -n $DAEMON ]; then
+            syslog "Waiting for wake-up signal..."
+            read S <$FIFOFILE
+            [ "$S" = "WUP" ] || continue
         fi
-        borg_create
-        borg_prune
-    fi
 
-    # End logging
-    print_log_footer
+        # Print a few statistics
+        print_log_header
+        print_dirs_stats
+
+        if [ -n "$EXEC" ]; then
+            borg_exec "$@"
+        else
+            # Do the backup
+            if ! [ -d $BORG_CACHE_DIR ]; then
+                borg_init
+            fi
+            borg_create
+            borg_prune
+        fi
+
+        # End logging
+        print_log_footer
+
+        # We loop again, unless we are not in daemon mode
+        [ -z $DAEMON ] && break
+    done
 
     # Release the lock
     lock_exit
@@ -331,6 +356,7 @@ shift $((OPTIND-1))
 # Check or perform install
 check_or_install_logrotate
 check_or_install_conf
+check_or_install_fifo
 
 # Read and check configuration
 read_and_check_conf
