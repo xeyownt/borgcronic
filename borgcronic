@@ -15,10 +15,30 @@ export BORG_KEYS_DIR=/var/lib/borg/keys
 export BORG_SECURITY_DIR=/var/lib/borg/security
 BORG_LASTSUCCESSFUL=$BORG_CACHE_DIR/$BASE.success
 
+log()
+{
+    LVL=$1
+    shift
+    case "$LVL" in
+        0)
+            echo "$@"
+            ;;
+        1)
+            echo "# $(date): $@"
+            ;;
+        2)
+            echo "## $@"
+            ;;
+        *)
+            echo "Unknown level '$LVL'"
+            ;;
+    esac
+}
+
 syslog()
 {
     logger --id=$$ -t $BASE "$@"
-    echo "# $(date): $@"
+    log 1 "$@"
 }
 
 die()
@@ -44,7 +64,7 @@ check_or_install_logrotate()
     [ -e $LOGROTATE ] && return
 
     if [ -d $(dirname $LOGROTATE) ]; then
-        >&2 echo "Installing logrotate file '$LOGROTATE'."
+        syslog "Installing logrotate file '$LOGROTATE'."
         cat > $LOGROTATE <<- __END__
 /var/log/$BASE
 {
@@ -66,7 +86,7 @@ check_or_install_conf()
 {
     [ -e $CONF ] && return
 
-    >&2 echo "Installing config file '$CONF'."
+    syslog "Installing config file '$CONF'."
     cat > $CONF <<- __END__
 ## BORG_REPO - mandatory
 #BORG_REPO=username@remoteserver.com:backup
@@ -85,13 +105,13 @@ __END__
 
 print_size_summary()
 {
-    echo "## Borg repo: $(sizeof $BORG_REPO)"
-    echo "## Borg cache: $(sizeof $BORG_CACHE_DIR)"
+    log 2 "Borg repo: $(sizeof $BORG_REPO)"
+    log 2 "Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
 check_root()
 {
-    [ $(whoami) == "root" ] || die 1 "Run this script as root or sudo"
+    [ $(whoami) == "root" ] || die 1 "Run this script as root or with sudo"
 }
 
 read_and_check_conf()
@@ -150,22 +170,22 @@ read_options()
 
 print_log_header()
 {
-    echo "####################################################################################################"
-    echo "# $(date) -- Start $BASE[$$]"
+    log 0 "####################################################################################################"
+    log 1 "Start $BASE[$$]"
 }
 
 print_log_footer()
 {
-    echo "# $(date) -- End $BASE[$$]"
+    log 1 "End $BASE[$$]"
 }
 
 doit()
 {
-    echo "# $(date) ## $@"
+    log 1 "## $@"
     print_size_summary
-    echo "===================================================================================================="
+    log 0 "===================================================================================================="
     "$@"
-    echo "===================================================================================================="
+    log 0 "===================================================================================================="
     print_size_summary
     # We must return exit status of "$@" !
 }
@@ -176,7 +196,7 @@ print_dirs_stats()
         DIRS_SZ=$(sizeof $DIRS)
         DIRS_ND=$(find $DIRS -type d|wc -l)
         DIRS_NF=$(find $DIRS -type f|wc -l)
-        echo "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
+        log 2 "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
     fi
 }
 
@@ -227,7 +247,7 @@ borg_exec()
 
 borg_init()
 {
-    echo "Init borg repository $BORG_REPO"
+    log 1 "Init borg repository $BORG_REPO"
     doit ${DRYRUN:+echo} borg init -e none ::
 }
 
