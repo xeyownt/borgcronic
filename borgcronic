@@ -28,7 +28,7 @@ sizeof()
     du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
 }
 
-install_logrotate()
+check_or_install_logrotate()
 {
     [ -e $LOGROTATE ] && return
 
@@ -51,7 +51,7 @@ __END__
     fi
 }
 
-install_conf()
+check_or_install_conf()
 {
     [ -e $CONF ] && return
 
@@ -72,19 +72,6 @@ __END__
     chmod 644 $CONF
 }
 
-check_or_do_install()
-{
-    # Create logrotate script and config if requested
-    if [ -n "$INSTALL_REQ" ]; then
-        install_logrotate
-        install_conf
-        exit 0
-    fi
-
-    [ -e $LOGROTATE ] && [ -e $CONF ] && return
-    die 1 "'$LOGROTATE' or '$CONF' missing. Please first run '$BASE -i' to run install procedure."
-}
-
 print_size_summary()
 {
     echo "## Borg repo: $(sizeof $BORG_REPO)"
@@ -96,7 +83,7 @@ check_root()
     [ $(whoami) == "root" ] || die 1 "Run this script as root or sudo"
 }
 
-read_conf()
+read_and_check_conf()
 {
     BORG_REPO=
     DIRS=
@@ -107,12 +94,9 @@ read_conf()
     export BORG_CACHE_DIR
     export BORG_KEYS_DIR
     export BORG_SECURITY_DIR
-}
 
-check_conf()
-{
-    [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty."
-    [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty."
+    [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty in '$CONF'."
+    [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty in '$CONF'."
     [ -d "$BORG_REPO" ] || die 1 "'$BORG_REPO' not found."
 }
 
@@ -121,20 +105,15 @@ read_options()
     # Parse options
     VERBOSE=0
     DIRS_STAT=
-    INSTALL_REQ=
     EXEC=
     DRYRUN=
 
-    local OPTIONS="disvx"
+    local OPTIONS="dsvx"
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
                 # dry-run mode
                 DRYRUN=true
-                ;;
-            i)
-                # install request
-                INSTALL_REQ=true
                 ;;
             s)
                 # Display DIRS statistics
@@ -325,11 +304,11 @@ read_options "$@"
 shift $((OPTIND-1))
 
 # Check or perform install
-check_or_do_install
+check_or_install_logrotate
+check_or_install_conf
 
 # Read and check configuration
-read_conf
-check_conf
+read_and_check_conf
 
 # Run main process
 main "$@"
