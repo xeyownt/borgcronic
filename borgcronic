@@ -116,19 +116,16 @@ read_options()
 {
     # Parse options
     BORG=borg
-    BG="&"
     VERBOSE=0
     DIRS_STAT=
     INSTALL_REQ=
 
-    while getopts "dfisv" flag; do
+    local OPTIONS="disv"
+    while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
                 # dry-run mode
                 BORG="echo $BORG" ;;
-            f)
-                # run in foreground
-                BG= ;;
             i)
                 # install request
                 INSTALL_REQ=true ;;
@@ -139,7 +136,7 @@ read_options()
                 # Verbose mode
                 VERBOSE=$((VERBOSE+1)) ;;
             *)
-                echo "Usage: $BASE.sh [-dfisv]"
+                echo "Usage: $BASE.sh [-$OPTIONS]"
                 exit 1
                 ;;
         esac
@@ -310,8 +307,5 @@ check_or_do_install
 read_conf
 check_conf
 
-# Run main process (in background by default)
-eval "main $BG"
-
-
-
+# Run main process
+main "$@"
