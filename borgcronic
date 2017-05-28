@@ -146,6 +146,9 @@ install_systemd()
 {
     installcheck_does_not_exist "systemd service" $SYSTEMD_SERVICE || return
 
+    # Stop service if running
+    systemctl is-active $BASE >/dev/null && systemctl stop $BASE
+
     cat > $SYSTEMD_SERVICE <<- __END__
 		[Unit]
 		Description=$BASE daemon
@@ -169,6 +172,8 @@ install_systemd()
 		WantedBy=multi-user.target
 	__END__
     chmod 644 $SYSTEMD_SERVICE
+
+    systemctl daemon-reload
     systemctl enable $BASE
     systemctl start $BASE
 }
