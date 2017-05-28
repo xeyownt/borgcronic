@@ -350,9 +350,10 @@ doit()
     print_size_summary
     log 0 "===================================================================================================="
     "$@"
+    local RC=$?
     log 0 "===================================================================================================="
     print_size_summary
-    # TODO: We must return exit status of "$@" !
+    return $RC
 }
 
 print_dirs_stats()
@@ -394,11 +395,14 @@ tryborg()
         SEC_DOING=$SECONDS
         doit borg "$@"
 
-        # Action successful - exit
-        [ $? -eq 0 ] && break
+        # If warning - Tell if we got a warning?
+        [ $? -eq 1 ] && warning "borg '$1' returned a WARNING code. Please check '$LOGFILE'."
 
-        # Action failed - Wait then retry
-        syslog Failed "'borg $1'"
+        # If warning or success - Exit
+        [ $? -le 1 ] && break
+
+        # If error - Wait then retry
+        syslog "Failed 'borg $1'"
         sleep $TRY_WAIT
     done
 
