@@ -38,7 +38,7 @@ log()
 
 syslog()
 {
-    logger --id=$$ -t $BASE "$@"
+    [ $MODE != exec ] && logger --id=$$ -t $BASE "$@"
     log 1 "$@"
 }
 
@@ -142,37 +142,40 @@ read_options()
     # Parse options
     VERBOSE=0
     DIRS_STAT=
-    EXEC=
     DRYRUN=
-    DAEMON=
+    MODE=wakeup
 
-    local OPTIONS="Ddsvx"
+    local OPTIONS="Ddisvx"
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             D)
                 # DAEMON mode
-                DAEMON=true
+                MODE=daemon
                 ;;
             d)
-                # dry-run mode
+                # Enable dry-run
                 DRYRUN=true
+                ;;
+            i)
+                # Init mode
+                MODE=init
                 ;;
             s)
                 # Display DIRS statistics
                 DIRS_STAT=true
                 ;;
             v)
-                # Verbose mode
+                # Increase Verbose level
                 VERBOSE=$((VERBOSE+1))
                 ;;
             x)
                 # Execute mode
-                EXEC=true
+                MODE=exec
                 VERBOSE=1
                 break
                 ;;
             *)
-                echo "Usage: $BASE.sh [-$OPTIONS]"
+                echo "Usage: $BASE [-$OPTIONS]"
                 exit 1
                 ;;
         esac
@@ -253,13 +256,7 @@ tryborg()
 
 borg_exec()
 {
-    tryborg ${DRYRUN:+--dry-run} "$@"
-}
-
-borg_init()
-{
-    log 1 "Init borg repository $BORG_REPO"
-    doit ${DRYRUN:+echo} borg init -e none ::
+    doit borg ${DRYRUN:+--dry-run} "$@"
 }
 
 borg_create()
@@ -289,6 +286,7 @@ lock_get()
 
         if ! kill -0 $OTHERPID &> /dev/null; then
             # lock is stale, remove it and retry
+            # TODO: fix race condition - another script may rm $LOCKDIR && mkdir $LOCKDIR here
             rm -r "$LOCKDIR" || die 99 "lock failed, but cannot rm lockdir"
         else
             die 99 "Lock failed, '$LOCKDIR' owned by pid $OTHERPID."
@@ -306,44 +304,70 @@ lock_exit()
 
 main()
 {
+    # TODO: check how it works on 1st install - must avoid repo init and/or the question about new repo
+    [ -d $BORG_CACHE_DIR ] || die 1 "$BORG_CACHE_DIR not found. Did you do '$BASE -x init' first?"
+
     # Get the lock
     lock_get
 
-    # Start logging and print a few statistics
+    # Print a few statistics
+    print_log_header
+    print_dirs_stats
+
+    borg_create
+    borg_prune
+
+    # End logging
+    print_log_footer
+
+    # Release the lock
+    lock_exit
+}
+
+mode_daemon()
+{
+    # Start logging
     start_logging
 
     while : ; do
         # If in daemon mode, we wait for wake-up (WUP) signal...
-        if [ -n $DAEMON ]; then
-            syslog "Waiting for wake-up signal..."
-            read S <$FIFOFILE
-            [ "$S" = "WUP" ] || continue
-        fi
+        syslog "Waiting for wake-up signal..."
+        read S <$FIFOFILE
+        [ "$S" = "WUP" ] || continue
 
-        # Print a few statistics
-        print_log_header
-        print_dirs_stats
-
-        if [ -n "$EXEC" ]; then
-            borg_exec "$@"
-        else
-            # Do the backup
-            if ! [ -d $BORG_CACHE_DIR ]; then
-                borg_init
-            fi
-            borg_create
-            borg_prune
-        fi
-
-        # End logging
-        print_log_footer
-
-        # We loop again, unless we are not in daemon mode
-        [ -z $DAEMON ] && break
+        main &
     done
+}
 
-    # Release the lock
-    lock_exit
+mode_exec()
+{
+    borg_exec "$@"
+}
+
+mode_init()
+{
+    # Start logging
+    start_logging
+
+    warning "Init not implemented yet."
+
+    check_or_install_logrotate
+    check_or_install_conf
+    check_or_install_fifo
+
+    # TODO: Or do this before fifo creation, and use [ -e $FIFOFILE ] for init test?
+    borg_exec ${DRYRUN:+echo} init -e none ::
+    borg_exec ${DRYRUN:+echo} list          # Necessary to force cache creation?
+}
+
+mode_wakeup()
+{
+    # Start logging
+    start_logging
+
+    # Send wakeup signal
+    syslog "Sending wakeup signal to daemon."
+    echo WUP >$FIFOFILE
 }
 
 # Must be root
@@ -361,5 +385,19 @@ check_or_install_fifo
 # Read and check configuration
 read_and_check_conf
 
-# Run main process
-main "$@"
+# TODO: Is current locking sufficient? Do we need more to protect log file access, cache update... ?
+case $MODE in
+    daemon)
+        mode_daemon "$@"
+        ;;
+    exec)
+        mode_exec "$@"
+        ;;
+    init)
+        mode_init "$@"
+        ;;
+    wakeup)
+        mode_wakeup "$@"
+        ;;
+esac
+
