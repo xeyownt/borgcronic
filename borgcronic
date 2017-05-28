@@ -514,9 +514,6 @@ mode_update()
     # Read and check configuration
     check_install_and_read_conf
 
-    # Start logging
-    start_logging
-
     # Update configuration and scripts files
     install_logrotate
     install_fifo
