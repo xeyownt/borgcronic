@@ -11,6 +11,7 @@ FIFOFILE=/var/run/$BASE.fifo
 CRON_DAILY=/etc/cron.daily/$BASE
 SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
+LOGGING=
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
 export BORG_CACHE_DIR=/var/cache/borg
@@ -22,6 +23,7 @@ log()
 {
     LVL=$1
     shift
+    [ -n "$LOGGING" ] || LVL=0
     case "$LVL" in
         0)
             echo "$@"
@@ -40,7 +42,7 @@ log()
 
 syslog()
 {
-    [ -n "$MODE" -a "$MODE" != exec ] && logger --id=$$ -t $BASE "$@"
+    [ "$MODE"=daemon -o "$MODE"=wakeup ] && logger --id=$$ -t $BASE "$@"
     log 1 "$@"
 }
 
@@ -62,12 +64,25 @@ sizeof()
     du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
 }
 
-check_or_install_logrotate()
+installcheck_does_not_exist()
 {
-    [ -e $LOGROTATE ] && return
+    local DESC=$1
+    local FILE=$2
 
+    if [ -z "$FORCE" -a -e $FILE ]; then
+        warning "Found $DESC file '$FILE', not overwriting (use '-f' to force or '-u' to update)."
+        return 1
+    fi
+    syslog "Installing $DESC file '$FILE'."
+
+    return 0
+}
+
+install_logrotate()
+{
     if [ -d $(dirname $LOGROTATE) ]; then
-        syslog "Installing logrotate file '$LOGROTATE'."
+        installcheck_does_not_exist "logrotate" $LOGROTATE || return
+
         cat > $LOGROTATE <<- __END__
 			$LOGFILE
 			{
@@ -85,14 +100,20 @@ check_or_install_logrotate()
     fi
 }
 
-check_or_install_conf()
+install_conf()
 {
-    [ -e $CONF ] && return
+    installcheck_does_not_exist "config" $CONF || return
 
-    syslog "Installing config file '$CONF'."
+    if [ -e $CONF ]; then
+        log 0 "Renaming old config file to '$CONF.old'"
+        mv $CONF $CONF.old || die 1 "Cannot rename config file to '$CONF.old'."
+    fi
+
     cat > $CONF <<- __END__
 		## BORG_REPO - mandatory
-		#BORG_REPO=username@remoteserver.com:backup
+		# BORG_REPO=username@remoteserver.com:borg
+		# BORG_REPO=/smb/remoteserver/borg
+		BORG_REPO=$BORG_REPO
 
 		## DIRS - mandatory
 		DIRS='/home'
@@ -106,28 +127,25 @@ check_or_install_conf()
     chmod 644 $CONF
 }
 
-check_or_install_fifo()
+install_fifo()
 {
-    [ -e $FIFOFILE ] && return
+    installcheck_does_not_exist "fifo" $FIFOFILE || return
 
-    syslog "Creating fifo '$FIFOFILE'"
     mkfifo -m 600 $FIFOFILE
 }
 
-check_or_install_cron_daily()
+install_cron_daily()
 {
-    [ -e $CRON_DAILY ] && return
+    installcheck_does_not_exist "cron daily job" $CRON_DAILY || return
 
-    syslog "Installing cron daily job '$0' -> '$CRON_DAILY'"
     cp $0 $CRON_DAILY
     chmod 755 $CRON_DAILY
 }
 
-check_or_install_systemd()
+install_systemd()
 {
-    [ -e $SYSTEMD_SERVICE ] && return
+    installcheck_does_not_exist "systemd service" $SYSTEMD_SERVICE || return
 
-    syslog "Installing systemd service file '$SYSTEMD_SERVICE'."
     cat > $SYSTEMD_SERVICE <<- __END__
 		[Unit]
 		Description=$BASE daemon
@@ -166,18 +184,23 @@ check_root()
     [ $(whoami) == "root" ] || die 1 "Run this script as root or with sudo"
 }
 
-read_and_check_conf()
+check_install_and_read_conf()
 {
+    # Check install
+    [ -e $CONF ] || die 1 "'$CONF' not found. Did you run the install script '$BASE -i <REPOSITORY>'"
+    [ -e $FIFOFILE ] || die 1 "'$FIFOFILE' not found. Did you run the install script '$BASE -i <REPOSITORY>'"
+
+    # Read conf
     BORG_REPO=
     DIRS=
     EXCLUDES=
-    [ -e $CONF ] || die 1 "'$CONF' not found."
     . $CONF
     export BORG_REPO
     export BORG_CACHE_DIR
     export BORG_KEYS_DIR
     export BORG_SECURITY_DIR
 
+    # Check conf
     [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty in '$CONF'."
     [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty in '$CONF'."
     [ -d "$BORG_REPO" ] || die 1 "'$BORG_REPO' not found."
@@ -190,8 +213,10 @@ read_options()
     DIRS_STAT=
     DRYRUN=
     MODE=wakeup
+    INSTALL_ARG=
+    FORCE=
 
-    local OPTIONS="Ddisvx"
+    local OPTIONS="Ddfi:suvx"
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             D)
@@ -202,13 +227,23 @@ read_options()
                 # Enable dry-run
                 DRYRUN=true
                 ;;
+            f)
+                # Force flag for install mode
+                FORCE=true
+                ;;
             i)
-                # Init mode
-                MODE=init
+                # Install mode
+                MODE=install
+                INSTALL_ARG=$OPTARG
                 ;;
             s)
                 # Display DIRS statistics
                 DIRS_STAT=true
+                ;;
+            u)
+                # Update mode
+                MODE=update
+                FORCE=true
                 ;;
             v)
                 # Increase Verbose level
@@ -221,8 +256,7 @@ read_options()
                 break
                 ;;
             *)
-                echo "Usage: $BASE [-$OPTIONS]"
-                exit 1
+                die 1 "Usage: $BASE [-$OPTIONS]"
                 ;;
         esac
     done
@@ -262,6 +296,7 @@ print_dirs_stats()
 
 start_logging()
 {
+    LOGGING=true
     [ -d $(dirname $LOGFILE) ] || mkdir -p $(dirname $LOGFILE)
     if [ $VERBOSE -ge 1 ]; then
         exec > >(tee -a $LOGFILE ) 2>&1
@@ -371,6 +406,9 @@ main()
 
 mode_daemon()
 {
+    # Read and check configuration
+    check_install_and_read_conf
+
     # Start logging
     start_logging
 
@@ -386,27 +424,53 @@ mode_daemon()
 
 mode_exec()
 {
+    # Read and check configuration
+    check_install_and_read_conf
+
     borg_exec "$@"
 }
 
-mode_init()
+mode_install()
 {
+    BORG_REPO=$INSTALL_ARG
+    mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
+
+    # Unstall configuration and scripts files
+    install_conf
+    install_logrotate
+    install_fifo
+    install_cron_daily
+    install_systemd
+
+    # Read and check configuration
+    check_install_and_read_conf
+
     # Start logging
     start_logging
 
-    warning "Init not implemented yet."
+    borg_exec ${DRYRUN:+echo} init -e none :: || die 1 "borg init failed."
+}
 
-    check_or_install_logrotate
-    check_or_install_conf
-    check_or_install_fifo
+mode_update()
+{
+    # Read and check configuration
+    check_install_and_read_conf
 
-    # TODO: Or do this before fifo creation, and use [ -e $FIFOFILE ] for init test?
-    borg_exec ${DRYRUN:+echo} init -e none ::
-    borg_exec ${DRYRUN:+echo} list          # Necessary to force cache creation?
+    # Start logging
+    start_logging
+
+    # Update configuration and scripts files
+    install_logrotate
+    install_fifo
+    install_cron_daily
+    install_systemd
 }
 
 mode_wakeup()
 {
+    # Read and check configuration
+    check_install_and_read_conf
+
     # Start logging
     start_logging
 
@@ -422,16 +486,6 @@ check_root
 read_options "$@"
 shift $((OPTIND-1))
 
-# Check or perform install
-check_or_install_logrotate
-check_or_install_conf
-check_or_install_fifo
-check_or_install_cron_daily
-check_or_install_systemd
-
-# Read and check configuration
-read_and_check_conf
-
 # TODO: Is current locking sufficient? Do we need more to protect log file access, cache update... ?
 case $MODE in
     daemon)
@@ -440,8 +494,11 @@ case $MODE in
     exec)
         mode_exec "$@"
         ;;
-    init)
-        mode_init "$@"
+    install)
+        mode_install "$@"
+        ;;
+    update)
+        mode_update "$@"
         ;;
     wakeup)
         mode_wakeup "$@"
