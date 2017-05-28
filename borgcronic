@@ -9,6 +9,7 @@ LOCKDIR=/var/lock/$BASE
 PIDFILE=/var/lock/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
 CRON_DAILY=/etc/cron.daily/$BASE
+CRON_D=/etc/cron.d/$BASE
 SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 LOGGING=
@@ -140,6 +141,21 @@ install_cron_daily()
 
     cp $0 $CRON_DAILY
     chmod 755 $CRON_DAILY
+}
+
+install_crond_d()
+{
+
+    installcheck_does_not_exist "cron.d job" $CRON_D || return
+
+    cat > $CRON_D <<- __END__
+		SHELL=/bin/sh
+		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
+
+		# Start $BASE every 6 hours during daylight
+		5 11-23/6 * * * root [ -x $CRON_DAILY ] && perl -le 'sleep rand 900' && $CRON_DAILY >/dev/null 2>&1
+	__END__
+    chmod 644 $CRON_D
 }
 
 install_systemd()
@@ -496,6 +512,7 @@ mode_install()
     install_logrotate
     install_fifo
     install_cron_daily
+    install_crond_d
     install_systemd
 
     # Read and check configuration
@@ -518,6 +535,7 @@ mode_update()
     install_logrotate
     install_fifo
     install_cron_daily
+    install_crond_d
     install_systemd
 }
 
