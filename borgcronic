@@ -216,6 +216,8 @@ usage_help()
     cat <<- __END__
 Usage: $BASE [-Ddfhsuv] [-i REPOSITORY] [-x ...]
 
+$BASE only runs as root user, or using sudo.
+
 Without any option, $BASE runs in WAKEUP mode:
 
     none    WAKEUP mode.
@@ -526,12 +528,12 @@ mode_wakeup()
     echo WUP >$FIFOFILE
 }
 
-# Must be root
-check_root
-
 # Read CLI options
 read_options "$@"
 shift $((OPTIND-1))
+
+# Must be root
+check_root
 
 # TODO: Is current locking sufficient? Do we need more to protect log file access, cache update... ?
 case $MODE in
