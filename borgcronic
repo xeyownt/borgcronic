@@ -8,6 +8,8 @@ LOGROTATE=/etc/logrotate.d/$BASE
 LOCKDIR=/var/lock/$BASE
 PIDFILE=/var/lock/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
+CRON_DAILY=/etc/cron.daily/$BASE
+SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 
 # Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
@@ -67,16 +69,16 @@ check_or_install_logrotate()
     if [ -d $(dirname $LOGROTATE) ]; then
         syslog "Installing logrotate file '$LOGROTATE'."
         cat > $LOGROTATE <<- __END__
-/var/log/$BASE
-{
-    rotate 4
-    weekly
-    missingok
-    notifempty
-    compress
-    delaycompress
-}
-__END__
+			$LOGFILE
+			{
+			    rotate 4
+			    weekly
+			    missingok
+			    notifempty
+			    compress
+			    delaycompress
+			}
+		__END__
         chmod 644 $LOGROTATE
     else
         warning "$(dirname $LOGROTATE) not found. Can't install logrotate script."
@@ -89,24 +91,68 @@ check_or_install_conf()
 
     syslog "Installing config file '$CONF'."
     cat > $CONF <<- __END__
-## BORG_REPO - mandatory
-#BORG_REPO=username@remoteserver.com:backup
+		## BORG_REPO - mandatory
+		#BORG_REPO=username@remoteserver.com:backup
 
-## DIRS - mandatory
-DIRS='/home'
+		## DIRS - mandatory
+		DIRS='/home'
 
-## EXCLUDES - optional
-EXCLUDES='--exclude */.cache'
-EXCLUDES+=' --exclude *.nobak'
-EXCLUDES+=' --exclude */xapiandb'
-EXCLUDES+=' --exclude */.thumbnails'
-__END__
+		## EXCLUDES - optional
+		EXCLUDES='--exclude */.cache'
+		EXCLUDES+=' --exclude *.nobak'
+		EXCLUDES+=' --exclude */xapiandb'
+		EXCLUDES+=' --exclude */.thumbnails'
+	__END__
     chmod 644 $CONF
 }
 
 check_or_install_fifo()
 {
-    [ -e $FIFOFILE ] || mkfifo -m 600 $FIFOFILE
+    [ -e $FIFOFILE ] && return
+
+    syslog "Creating fifo '$FIFOFILE'"
+    mkfifo -m 600 $FIFOFILE
+}
+
+check_or_install_cron_daily()
+{
+    [ -e $CRON_DAILY ] && return
+
+    syslog "Installing cron daily job '$0' -> '$CRON_DAILY'"
+    cp $0 $CRON_DAILY
+    chmod 755 $CRON_DAILY
+}
+
+check_or_install_systemd()
+{
+    [ -e $SYSTEMD_SERVICE ] && return
+
+    syslog "Installing systemd service file '$SYSTEMD_SERVICE'."
+    cat > $SYSTEMD_SERVICE <<- __END__
+		[Unit]
+		Description=$BASE daemon
+		After=network-online.target
+
+		[Service]
+		Type=simple
+
+		User=root
+		Group=root
+		UMask=022
+
+		ExecStart=$CRON_DAILY -D
+
+		Restart=on-failure
+
+		# Configures the time to wait before service is stopped forcefully.
+		TimeoutStopSec=300
+
+		[Install]
+		WantedBy=multi-user.target
+	__END__
+    chmod 644 $SYSTEMD_SERVICE
+    systemctl enable $BASE
+    systemctl start $BASE
 }
 
 print_size_summary()
@@ -380,6 +426,8 @@ shift $((OPTIND-1))
 check_or_install_logrotate
 check_or_install_conf
 check_or_install_fifo
+check_or_install_cron_daily
+check_or_install_systemd
 
 # Read and check configuration
 read_and_check_conf
