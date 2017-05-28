@@ -185,12 +185,12 @@ read_options()
 print_log_header()
 {
     log 0 "####################################################################################################"
-    log 1 "Start $BASE[$$]"
+    syslog "Starting $BASE[$$]"
 }
 
 print_log_footer()
 {
-    log 1 "End $BASE[$$]"
+    syslog "Ending $BASE[$$]"
 }
 
 doit()
@@ -308,20 +308,18 @@ main()
     # TODO: check how it works on 1st install - must avoid repo init and/or the question about new repo
     [ -d $BORG_CACHE_DIR ] || die 1 "$BORG_CACHE_DIR not found. Did you do '$BASE -x init' first?"
 
-    # Get the lock
+    # Get the lock and print log header
     lock_get
+    print_log_header
 
     # Print a few statistics
-    print_log_header
     print_dirs_stats
 
     borg_create
     borg_prune
 
-    # End logging
+    # End logging, release the lock and exit
     print_log_footer
-
-    # Release the lock
     lock_exit
 }
 
