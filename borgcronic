@@ -132,6 +132,7 @@ install_fifo()
 {
     installcheck_does_not_exist "fifo" $FIFOFILE || return
 
+    rm -f $FIFOFILE
     mkfifo -m 600 $FIFOFILE
 }
 
