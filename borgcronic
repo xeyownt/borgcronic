@@ -206,6 +206,43 @@ check_install_and_read_conf()
     [ -d "$BORG_REPO" ] || die 1 "'$BORG_REPO' not found."
 }
 
+usage_help()
+{
+    cat <<- __END__
+Usage: $BASE [-Ddfhsuv] [-i REPOSITORY] [-x ...]
+
+Without any option, $BASE runs in WAKEUP mode:
+
+    none    WAKEUP mode.
+            In this mode, it sends a wakeup signal to daemon in order to 
+            trigger a backup.
+
+The other modes are:
+
+    -D      DAEMON mode.
+            $BASE waits for wakeup signal. This signal triggers a backup.
+    -i REPOSITORY
+            INSTALL mode.
+            Install $BASE, configuration and script files, then run
+            borg to initialize REPOSITORY. Use -f to force overwriting
+            existing files.
+    -u      UPDATE mode.
+            Same as INSTALL, but does not update configuration. 
+            Implies flag -f. The configuration file is NOT modified.
+    -x      EXEC mode.
+            Run borg, passing the remaining parameters on the line
+            to borg. This is handy to run borg using $BASE configuration.
+
+Flags or options:
+
+    -d      Run borg in dry-run mode (only for DAEMON or EXEC mode).
+    -f      Force overwriting existing files in INSTALL mode.
+    -h      This help.
+    -s      Display statistics on DIRS before starting the backup.
+    -v      Increase verbose level.
+__END__
+}
+
 read_options()
 {
     # Parse options
@@ -216,7 +253,7 @@ read_options()
     INSTALL_ARG=
     FORCE=
 
-    local OPTIONS="Ddfi:suvx"
+    local OPTIONS="Ddfhi:suvx?"
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             D)
@@ -230,6 +267,11 @@ read_options()
             f)
                 # Force flag for install mode
                 FORCE=true
+                ;;
+            h)
+                # Display help
+                usage_help
+                exit 0
                 ;;
             i)
                 # Install mode
@@ -256,7 +298,7 @@ read_options()
                 break
                 ;;
             *)
-                die 1 "Usage: $BASE [-$OPTIONS]"
+                die 1 "Usage: $BASE [-$OPTIONS]. Type '$BASE -h' for help."
                 ;;
         esac
     done
