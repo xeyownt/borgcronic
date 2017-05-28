@@ -42,7 +42,7 @@ log()
 
 syslog()
 {
-    [ "$MODE"=daemon -o "$MODE"=wakeup ] && logger --id=$$ -t $BASE "$@"
+    [ "$MODE" = daemon -o "$MODE" = wakeup ] && logger --id=$$ -t $BASE "$@"
     log 1 "$@"
 }
 
@@ -256,7 +256,7 @@ read_options()
     VERBOSE=0
     DIRS_STAT=
     DRYRUN=
-    MODE=wakeup
+    MODE=
     INSTALL_ARG=
     FORCE=
 
@@ -309,6 +309,9 @@ read_options()
                 ;;
         esac
     done
+
+    # WAKEUP is the default mode
+    MODE=${MODE:-wakeup}
 }
 
 print_log_header()
