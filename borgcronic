@@ -38,7 +38,7 @@ log()
 
 syslog()
 {
-    [ $MODE != exec ] && logger --id=$$ -t $BASE "$@"
+    [ -n "$MODE" -a "$MODE" != exec ] && logger --id=$$ -t $BASE "$@"
     log 1 "$@"
 }
 
