@@ -284,6 +284,7 @@ read_options()
                 # Install mode
                 MODE=install
                 INSTALL_ARG=$OPTARG
+                VERBOSE=1
                 ;;
             s)
                 # Display DIRS statistics
@@ -293,6 +294,7 @@ read_options()
                 # Update mode
                 MODE=update
                 FORCE=true
+                VERBOSE=1
                 ;;
             v)
                 # Increase Verbose level
