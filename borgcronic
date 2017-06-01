@@ -128,14 +128,6 @@ install_conf()
     chmod 644 $CONF
 }
 
-install_fifo()
-{
-    installcheck_does_not_exist "fifo" $FIFOFILE || return
-
-    rm -f $FIFOFILE
-    mkfifo -m 600 $FIFOFILE
-}
-
 install_cron_daily()
 {
     installcheck_does_not_exist "cron daily job" $CRON_DAILY || return
@@ -210,7 +202,6 @@ check_install_and_read_conf()
 {
     # Check install
     [ -e $CONF ] || die 1 "'$CONF' not found. Did you run the install script '$BASE -i <REPOSITORY>'"
-    [ -e $FIFOFILE ] || die 1 "'$FIFOFILE' not found. Did you run the install script '$BASE -i <REPOSITORY>'"
 
     # Read conf
     BORG_REPO=
@@ -486,6 +477,10 @@ mode_daemon()
     # Start logging
     start_logging
 
+    # Create our fifo we will listen on
+    rm -f $FIFOFILE
+    mkfifo -m 600 $FIFOFILE
+
     while : ; do
         # If in daemon mode, we wait for wake-up (WUP) signal...
         syslog "[DAEMON] Waiting for wake-up signal..."
@@ -553,7 +548,7 @@ mode_wakeup()
 
     # Send wakeup signal
     syslog "[WAKEUP] Sending wakeup signal to daemon."
-    echo WUP >$FIFOFILE
+    [ -e $FIFOFILE ] && echo WUP >$FIFOFILE
 }
 
 # Read CLI options
