@@ -216,7 +216,6 @@ check_install_and_read_conf()
     # Check conf
     [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty in '$CONF'."
     [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty in '$CONF'."
-    [ -d "$BORG_REPO" ] || die 1 "'$BORG_REPO' not found."
 }
 
 usage_help()
