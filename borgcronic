@@ -508,7 +508,6 @@ mode_install()
     # Unstall configuration and scripts files
     install_conf
     install_logrotate
-    install_fifo
     install_cron_daily
     install_crond_d
     install_systemd
@@ -531,7 +530,6 @@ mode_update()
 
     # Update configuration and scripts files
     install_logrotate
-    install_fifo
     install_cron_daily
     install_crond_d
     install_systemd
