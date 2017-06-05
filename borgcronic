@@ -490,7 +490,7 @@ mode_exec()
     # Read and check configuration
     check_install_and_read_conf
 
-    doit borg ${DRYRUN:+--dry-run} "$@"
+    borg ${DRYRUN:+--dry-run} "$@"
 }
 
 mode_install()
