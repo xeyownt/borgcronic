@@ -221,7 +221,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|update|wakeup]
+Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|wakeup]
 
 $BASE only runs as root user, or using sudo.
 
@@ -238,6 +238,9 @@ The modes are:
             Install $BASE, configuration and script files, then run
             borg to initialize REPOSITORY. Use -f to force overwriting
             existing files.
+    last
+            LAST mode.
+            Print a summary of last archives found in the repository for each host.
     update  UPDATE mode.
             Same as INSTALL, but does not update configuration.
             Implies flag -f. The configuration file is NOT modified.
@@ -267,7 +270,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhsv"
-    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|update|wakeup]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|wakeup]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -304,7 +307,7 @@ read_options()
             # wakeup is the default mode
             MODE=wakeup
             ;;
-        xexec)
+        xexec|xlast)
             VERBOSE=1
             ;;
         xinstall)
@@ -517,6 +520,26 @@ mode_install()
     doit ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
 }
 
+mode_last()
+{
+    # Read and check configuration
+    check_install_and_read_conf
+
+    out=$(borg list)
+    sep1=$(date +"--- Now -------------------------------------------------------------- _%Y%m%d_%H%M" -d "now")
+    sep2=$(date +"--- yesterday -------------------------------------------------------- _%Y%m%d_%H%M" -d "yesterday")
+    sep3=$(date +"--- 2 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "2 days ago")
+    sep4=$(date +"--- 3 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "3 days ago")
+    sep5=$(date +"--- last week -------------------------------------------------------- _%Y%m%d_%H%M" -d "last week")
+
+    export LC_ALL=C
+    echo "$out"$'\n'"$sep1"$'\n'"$sep2"$'\n'"$sep3"$'\n'"$sep4"$'\n'"$sep5" \
+        | sort -r \
+        | sort -t_ -u -k1,1 \
+        | sort -r -t_ -k2 \
+        | sed -r '/^---/{s/_.*//; s/^|$/\n/g; b}; s/\[.*//'
+}
+
 mode_update()
 {
     log 0 "[UPDATE] Updating $BASE."
@@ -561,6 +584,9 @@ case $MODE in
         ;;
     install)
         mode_install "$@"
+        ;;
+    last)
+        mode_last "$@"
         ;;
     update)
         mode_update "$@"
