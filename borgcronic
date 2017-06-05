@@ -403,7 +403,7 @@ tryborg()
 borg_create()
 {
     tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
-        ::'{hostname}-{now:%Y-%m-%d_%H%M}'                              \
+        ::'{hostname}_{now:%Y%m%d_%H%M}'                              \
         $DIRS                                                           \
         $EXCLUDES
 }
@@ -411,11 +411,11 @@ borg_create()
 borg_prune()
 {
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}-' prefix is very important to
+    # archives of THIS machine. The '{hostname}_' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
     tryborg prune ${DRYRUN:+--dry-run} -v --list \
-        :: --prefix '{hostname}-'                \
+        :: --prefix '{hostname}_'                \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 }
 
