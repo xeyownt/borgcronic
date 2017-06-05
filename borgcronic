@@ -400,11 +400,6 @@ tryborg()
     syslog Done "'borg $1'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
 }
 
-borg_exec()
-{
-    doit borg ${DRYRUN:+--dry-run} "$@"
-}
-
 borg_create()
 {
     tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
@@ -495,7 +490,7 @@ mode_exec()
     # Read and check configuration
     check_install_and_read_conf
 
-    borg_exec "$@"
+    doit borg ${DRYRUN:+--dry-run} "$@"
 }
 
 mode_install()
@@ -518,7 +513,7 @@ mode_install()
     # Start logging
     start_logging
 
-    borg_exec ${DRYRUN:+echo} init -e none :: || die 1 "borg init failed."
+    doit ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
 }
 
 mode_update()
