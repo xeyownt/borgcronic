@@ -170,7 +170,7 @@ install_systemd()
 		Group=root
 		UMask=022
 
-		ExecStart=$CRON_DAILY -D
+		ExecStart=$CRON_DAILY daemon
 
 		Restart=on-failure
 
@@ -201,7 +201,7 @@ check_root()
 check_install_and_read_conf()
 {
     # Check install
-    [ -e $CONF ] || die 1 "'$CONF' not found. Did you run the install script '$BASE -i <REPOSITORY>'"
+    [ -e $CONF ] || die 1 "'$CONF' not found. Did you run the install script '$BASE install <REPOSITORY>'"
 
     # Read conf
     BORG_REPO=
@@ -221,31 +221,31 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-Ddfhsuv] [-i REPOSITORY] [-x ...]
+Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|update|wakeup]
 
 $BASE only runs as root user, or using sudo.
 
-Without any option, $BASE runs in WAKEUP mode:
+The modes are:
 
-    none    WAKEUP mode.
-            In this mode, it sends a wakeup signal to daemon in order to 
-            trigger a backup.
-
-The other modes are:
-
-    -D      DAEMON mode.
+    daemon  DAEMON mode.
             $BASE waits for wakeup signal. This signal triggers a backup.
-    -i REPOSITORY
+    exec ...
+            EXEC mode.
+            Run borg, passing the remaining parameters on the line
+            to borg. This is handy to run borg using $BASE configuration.
+    install REPOSITORY
             INSTALL mode.
             Install $BASE, configuration and script files, then run
             borg to initialize REPOSITORY. Use -f to force overwriting
             existing files.
-    -u      UPDATE mode.
-            Same as INSTALL, but does not update configuration. 
+    update  UPDATE mode.
+            Same as INSTALL, but does not update configuration.
             Implies flag -f. The configuration file is NOT modified.
-    -x      EXEC mode.
-            Run borg, passing the remaining parameters on the line
-            to borg. This is handy to run borg using $BASE configuration.
+    wakeup  WAKEUP mode.
+            In this mode, it sends a wakeup signal to daemon in order to 
+            trigger a backup.
+
+Without any option, $BASE runs in WAKEUP mode.
 
 Flags or options:
 
@@ -263,17 +263,13 @@ read_options()
     VERBOSE=0
     DIRS_STAT=
     DRYRUN=
-    MODE=
     INSTALL_ARG=
     FORCE=
 
-    local OPTIONS="Ddfhi:suvx?"
+    local OPTIONS="dfhsv"
+    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|update|wakeup]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
-            D)
-                # DAEMON mode
-                MODE=daemon
-                ;;
             d)
                 # Enable dry-run
                 DRYRUN=true
@@ -287,40 +283,45 @@ read_options()
                 usage_help
                 exit 0
                 ;;
-            i)
-                # Install mode
-                MODE=install
-                INSTALL_ARG=$OPTARG
-                VERBOSE=1
-                ;;
             s)
                 # Display DIRS statistics
                 DIRS_STAT=true
-                ;;
-            u)
-                # Update mode
-                MODE=update
-                FORCE=true
-                VERBOSE=1
                 ;;
             v)
                 # Increase Verbose level
                 VERBOSE=$((VERBOSE+1))
                 ;;
-            x)
-                # Execute mode
-                MODE=exec
-                VERBOSE=1
-                break
-                ;;
             *)
-                die 1 "Usage: $BASE [-$OPTIONS]. Type '$BASE -h' for help."
+                die 1 "$usage"
                 ;;
         esac
     done
 
-    # WAKEUP is the default mode
-    MODE=${MODE:-wakeup}
+    shift $((OPTIND-1))
+    MODE=$1
+    case "x$MODE" in
+        x)
+            # wakeup is the default mode
+            MODE=wakeup
+            ;;
+        xexec)
+            VERBOSE=1
+            ;;
+        xinstall)
+            INSTALL_ARG=$2
+            VERBOSE=1
+            ;;
+        xdaemon|xwakeup)
+            ;;
+        xupdate)
+            FORCE=true
+            VERBOSE=1
+            ;;
+        *)
+            die 1 "$usage"
+            ;;
+    esac
+    ((OPTIND++))
 }
 
 print_log_header()
@@ -403,7 +404,7 @@ tryborg()
 borg_create()
 {
     tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
-        ::'{hostname}_{now:%Y%m%d_%H%M}'                              \
+        ::'{hostname}_{now:%Y%m%d_%H%M}'                                \
         $DIRS                                                           \
         $EXCLUDES
 }
@@ -446,7 +447,7 @@ lock_exit()
 main()
 {
     # TODO: check how it works on 1st install - must avoid repo init and/or the question about new repo
-    [ -d $BORG_CACHE_DIR ] || die 1 "$BORG_CACHE_DIR not found. Did you do '$BASE -x init' first?"
+    [ -d $BORG_CACHE_DIR ] || die 1 "$BORG_CACHE_DIR not found. Did you do '$BASE install' first?"
 
     # Get the lock and print log header
     lock_get
