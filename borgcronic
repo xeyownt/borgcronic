@@ -525,12 +525,12 @@ mode_last()
     # Read and check configuration
     check_install_and_read_conf
 
-    out=$(borg list)
-    sep1=$(date +"--- Now -------------------------------------------------------------- _%Y%m%d_%H%M" -d "now")
-    sep2=$(date +"--- yesterday -------------------------------------------------------- _%Y%m%d_%H%M" -d "yesterday")
-    sep3=$(date +"--- 2 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "2 days ago")
-    sep4=$(date +"--- 3 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "3 days ago")
-    sep5=$(date +"--- last week -------------------------------------------------------- _%Y%m%d_%H%M" -d "last week")
+    local out=$(borg list)
+    local sep1=$(date +"--- Now -------------------------------------------------------------- _%Y%m%d_%H%M" -d "now")
+    local sep2=$(date +"--- yesterday -------------------------------------------------------- _%Y%m%d_%H%M" -d "yesterday")
+    local sep3=$(date +"--- 2 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "2 days ago")
+    local sep4=$(date +"--- 3 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "3 days ago")
+    local sep5=$(date +"--- last week -------------------------------------------------------- _%Y%m%d_%H%M" -d "last week")
 
     export LC_ALL=C
     echo "$out"$'\n'"$sep1"$'\n'"$sep2"$'\n'"$sep3"$'\n'"$sep4"$'\n'"$sep5" \
