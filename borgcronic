@@ -316,12 +316,6 @@ read_options()
 print_log_header()
 {
     log 0 "####################################################################################################"
-    syslog "Starting $BASE[$BASHPID]"
-}
-
-print_log_footer()
-{
-    syslog "Ending $BASE[$BASHPID]"
 }
 
 doit()
@@ -425,8 +419,6 @@ summon_backup()
     borg_create
     borg_prune
 
-    # Print log footer
-    print_log_footer
 }
 
 cmd_daemon()
