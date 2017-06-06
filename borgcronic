@@ -247,7 +247,6 @@ Flags or options:
     -d      Run borg in dry-run mode (only for DAEMON or EXEC command).
     -f      Force overwriting existing files in INSTALL command.
     -h      This help.
-    -s      Display statistics on DIRS before starting the backup.
     -v      Increase verbose level.
 __END__
 }
@@ -256,12 +255,11 @@ read_options()
 {
     # Parse options
     VERBOSE=0
-    DIRS_STAT=
     DRYRUN=
     INSTALL_ARG=
     FORCE=
 
-    local OPTIONS="dfhsv"
+    local OPTIONS="dfhv"
     local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|summon]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
@@ -277,10 +275,6 @@ read_options()
                 # Display help
                 usage_help
                 exit 0
-                ;;
-            s)
-                # Display DIRS statistics
-                DIRS_STAT=true
                 ;;
             v)
                 # Increase Verbose level
@@ -340,16 +334,6 @@ doit()
     log 0 "===================================================================================================="
     print_size_summary
     return $RC
-}
-
-print_dirs_stats()
-{
-    if [ -n "$DIRS_STAT" ]; then
-        DIRS_SZ=$(sizeof $DIRS)
-        DIRS_ND=$(find $DIRS -type d|wc -l)
-        DIRS_NF=$(find $DIRS -type f|wc -l)
-        log 2 "* $DIRS_SZ, $DIRS_ND directories, $DIRS_NF files."
-    fi
 }
 
 start_logging()
@@ -438,9 +422,6 @@ summon_backup()
 {
     # Print log header
     print_log_header
-
-    # Print a few statistics
-    print_dirs_stats
 
     borg_create
     borg_prune
