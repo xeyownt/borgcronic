@@ -27,16 +27,16 @@ log()
     [ -n "$LOGGING" ] || LVL=0
     case "$LVL" in
         0)
-            echo "$@"
+            >&2 echo "$@"
             ;;
         1)
-            echo "# $(date): $@"
+            >&2 echo "# $(date): $@"
             ;;
         2)
-            echo "## $@"
+            >&2 echo "## $@"
             ;;
         *)
-            echo "Unknown level '$LVL'"
+            >&2 echo "Unknown level '$LVL'"
             ;;
     esac
 }
