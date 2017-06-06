@@ -469,8 +469,8 @@ mode_daemon()
     # Create our fifo we will listen on
     rm -f $FIFOFILE
     mkfifo -m 600 $FIFOFILE
-    exec 3<$FIFOFILE           # Keep fifo open so that writers are not blocked and don't get SIGPIPE
-
+    exec 3<>$FIFOFILE                                       # Open in/out FD on fifo...
+                                                            # .. so writers are not blocked / SIGPIPE'd
     while : ; do
         if ! read -t 0 R <$FIFOFILE; then                   # If no pending request
             unset IGNORE                                    # ... clear ignore list
