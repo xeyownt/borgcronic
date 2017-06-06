@@ -225,34 +225,27 @@ Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|summon]
 
 $BASE only runs as root user, or using sudo.
 
-The modes are:
+The commands are:
 
-    daemon  DAEMON mode.
-            $BASE waits for summon signal. This signal triggers a backup.
+    daemon  Starts as a daemon. $BASE waits for summoning signals.
     exec ...
-            EXEC mode.
             Run borg, passing the remaining parameters on the line
             to borg. This is handy to run borg using $BASE configuration.
     install REPOSITORY
-            INSTALL mode.
             Install $BASE, configuration and script files, then run
             borg to initialize REPOSITORY. Use -f to force overwriting
             existing files.
-    last
-            LAST mode.
-            Print a summary of last archives found in the repository for each host.
-    update  UPDATE mode.
-            Same as INSTALL, but does not update configuration.
+    last    Print a summary of last archives found in the repository for each host.
+    update  Same as INSTALL, but does not update configuration.
             Implies flag -f. The configuration file is NOT modified.
-    summon  SUMMON mode.
-            In this mode, it summons the daemon to trigger a backup.
+    summon  Summons the daemon to trigger a backup.
 
-Without any option, $BASE runs in SUMMON mode.
+Without any option, $BASE executes the SUMMON command.
 
 Flags or options:
 
-    -d      Run borg in dry-run mode (only for DAEMON or EXEC mode).
-    -f      Force overwriting existing files in INSTALL mode.
+    -d      Run borg in dry-run mode (only for DAEMON or EXEC command).
+    -f      Force overwriting existing files in INSTALL command.
     -h      This help.
     -s      Display statistics on DIRS before starting the backup.
     -v      Increase verbose level.
@@ -456,7 +449,7 @@ summon_backup()
     print_log_footer
 }
 
-mode_daemon()
+cmd_daemon()
 {
     declare -A IGNORE
 
@@ -490,12 +483,12 @@ mode_daemon()
     # Release the lock - On SIGINT / SIGTERM / SIGEXIT
 }
 
-mode_exec()
+cmd_exec()
 {
     borg ${DRYRUN:+--dry-run} "$@"
 }
 
-mode_install()
+cmd_install()
 {
     log 0 "[INSTALL] Installing $BASE."
 
@@ -518,7 +511,7 @@ mode_install()
     doit ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
 }
 
-mode_last()
+cmd_last()
 {
     local out=$(borg list)
     local sep1=$(date +"--- Now -------------------------------------------------------------- _%Y%m%d_%H%M" -d "now")
@@ -535,7 +528,7 @@ mode_last()
         | sed -r '/^---/{s/_.*//; s/^|$/\n/g; b}; s/\[.*//'
 }
 
-mode_update()
+cmd_update()
 {
     log 0 "[UPDATE] Updating $BASE."
 
@@ -546,7 +539,7 @@ mode_update()
     install_systemd
 }
 
-mode_summon()
+cmd_summon()
 {
     # Start logging
     start_logging
@@ -569,22 +562,22 @@ check_root
 # TODO: Is current locking sufficient? Do we need more to protect log file access, cache update... ?
 case $MODE in
     daemon)
-        mode_daemon "$@"
+        cmd_daemon "$@"
         ;;
     exec)
-        mode_exec "$@"
+        cmd_exec "$@"
         ;;
     install)
-        mode_install "$@"
+        cmd_install "$@"
         ;;
     last)
-        mode_last "$@"
+        cmd_last "$@"
         ;;
     update)
-        mode_update "$@"
+        cmd_update "$@"
         ;;
     summon)
-        mode_summon "$@"
+        cmd_summon "$@"
         ;;
 esac
 
