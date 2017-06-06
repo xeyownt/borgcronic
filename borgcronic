@@ -248,7 +248,9 @@ The commands are:
             Summons the daemon to collect archives statistics as with LAST
             command, and to send the result by mail.
 
-Without any option, $BASE executes the SUMMON command.
+Without any option, $BASE executes the default command. When invoked as '$BASE', the
+default command is SUMMON. When invoked as '$BASE-COMMAND', the default command is 
+'COMMAND'. This is useful for cron jobs.
 
 Flags or options:
 
@@ -295,7 +297,13 @@ read_options()
     done
 
     shift $((OPTIND-1))
-    MODE=${1:-summon}
+
+    # Extract default command from invocation string
+    BASENAME=$(basename $0)
+    MODE=${1:-${BASENAME##$BASE-}}
+    [ $MODE = $BASE ] && MODE=summon
+
+    # Process command
     case "$MODE" in
         exec|last)
             VERBOSE=1
