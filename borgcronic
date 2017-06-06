@@ -460,9 +460,6 @@ mode_daemon()
 {
     declare -A IGNORE
 
-    # Read and check configuration
-    check_install_and_read_conf
-
     # Get the lock
     lock_get
 
@@ -497,9 +494,6 @@ mode_daemon()
 
 mode_exec()
 {
-    # Read and check configuration
-    check_install_and_read_conf
-
     borg ${DRYRUN:+--dry-run} "$@"
 }
 
@@ -528,9 +522,6 @@ mode_install()
 
 mode_last()
 {
-    # Read and check configuration
-    check_install_and_read_conf
-
     local out=$(borg list)
     local sep1=$(date +"--- Now -------------------------------------------------------------- _%Y%m%d_%H%M" -d "now")
     local sep2=$(date +"--- yesterday -------------------------------------------------------- _%Y%m%d_%H%M" -d "yesterday")
@@ -550,9 +541,6 @@ mode_update()
 {
     log 0 "[UPDATE] Updating $BASE."
 
-    # Read and check configuration
-    check_install_and_read_conf
-
     # Update configuration and scripts files
     install_logrotate
     install_cron_daily
@@ -562,9 +550,6 @@ mode_update()
 
 mode_summon()
 {
-    # Read and check configuration
-    check_install_and_read_conf
-
     # Start logging
     start_logging
 
@@ -579,6 +564,9 @@ shift $((OPTIND-1))
 
 # Must be root
 check_root
+
+# Read and check configuration, unless if installing
+[ "$MODE" = install ] || check_install_and_read_conf
 
 # TODO: Is current locking sufficient? Do we need more to protect log file access, cache update... ?
 case $MODE in
