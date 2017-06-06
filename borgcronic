@@ -438,7 +438,7 @@ lock_get()
     done
 
     echo $BASHPID > $PIDFILE
-    trap 'trap - INT TERM EXIT; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
+    trap 'trap - INT TERM EXIT; syslog "[daemon] exorcized..."; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
 }
 
 summon_backup()
@@ -460,24 +460,22 @@ mode_daemon()
 {
     declare -A IGNORE
 
-    # Get the lock
-    lock_get
+    lock_get                                                # Get the lock
 
-    # Start logging
-    start_logging
+    start_logging                                           # Start logging
 
-    # Create our fifo we will listen on
-    rm -f $FIFOFILE
+    rm -f $FIFOFILE                                         # Create our fifo we will listen on
     mkfifo -m 600 $FIFOFILE
     exec 3<>$FIFOFILE                                       # Open in/out FD on fifo...
                                                             # .. so writers are not blocked / SIGPIPE'd
     while : ; do
         if ! read -t 0 R <$FIFOFILE; then                   # If no pending request
             unset IGNORE                                    # ... clear ignore list
-            syslog "[DAEMON] Waiting for wake-up signal..." # ... notify syslog
+            syslog "[daemon] Waiting for minions..."        # ... notify syslog
         fi
 
         read R <$FIFOFILE                                   # Get next request
+        syslog "[daemon] Got '$R' signal."
         [ -z "${IGNORE[$R]}" ] || continue                  # Skip request if in the ignore list
 
         case "$R" in
@@ -554,7 +552,7 @@ mode_summon()
     start_logging
 
     # Summon the daemon
-    syslog "[SUMMON] Pray the daemon: BACKUP request."
+    syslog "Summon the daemon: 'backup!'."
     [ -e $FIFOFILE ] && echo B >$FIFOFILE
 }
 
