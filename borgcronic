@@ -9,6 +9,7 @@ LOCKDIR=/var/lock/$BASE
 PIDFILE=/var/lock/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
 CRON_DAILY=/etc/cron.daily/$BASE
+CRON_WEEKLY=/etc/cron.weekly/$BASE-summon-last
 CRON_D=/etc/cron.d/$BASE
 SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
@@ -139,6 +140,13 @@ install_cron_daily()
 
     cp $0 $CRON_DAILY
     chmod 755 $CRON_DAILY
+}
+
+install_cron_weekly()
+{
+    installcheck_does_not_exist "cron weekly job" $CRON_WEEKLY || return
+
+    ln -sf $CRON_DAILY $CRON_WEEKLY
 }
 
 install_crond_d()
@@ -509,6 +517,7 @@ cmd_install()
     install_conf
     install_logrotate
     install_cron_daily
+    install_cron_weekly
     install_crond_d
     install_systemd
 
@@ -545,6 +554,7 @@ cmd_update()
     # Update configuration and scripts files
     install_logrotate
     install_cron_daily
+    install_cron_weekly
     install_crond_d
     install_systemd
 }
