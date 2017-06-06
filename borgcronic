@@ -43,7 +43,7 @@ log()
 
 syslog()
 {
-    [ "$MODE" = daemon -o "$MODE" = summon ] && logger --id=$BASHPID -t $BASE "$@"
+    [[ "$MODE" = daemon || "$MODE" = summon* ]] && logger --id=$BASHPID -t $BASE "$@"
     log 1 "$@"
 }
 
@@ -124,6 +124,11 @@ install_conf()
 		EXCLUDES+=' --exclude *.nobak'
 		EXCLUDES+=' --exclude */xapiandb'
 		EXCLUDES+=' --exclude */.thumbnails'
+		
+		## MAIL
+		MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
+		MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
+		MAIL_ERROR='/usr/bin/mail -s"Borgcronic ERROR" root'
 	__END__
     chmod 644 $CONF
 }
@@ -221,7 +226,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|summon]
+Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|summon|summon-last]
 
 $BASE only runs as root user, or using sudo.
 
@@ -239,6 +244,9 @@ The commands are:
     update  Same as INSTALL, but does not update configuration.
             Implies flag -f. The configuration file is NOT modified.
     summon  Summons the daemon to trigger a backup.
+    summon-last
+            Summons the daemon to collect archives statistics as with LAST
+            command, and to send the result by mail.
 
 Without any option, $BASE executes the SUMMON command.
 
@@ -260,7 +268,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|summon]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -287,22 +295,18 @@ read_options()
     done
 
     shift $((OPTIND-1))
-    MODE=$1
-    case "x$MODE" in
-        x)
-            # summon is the default mode
-            MODE=summon
-            ;;
-        xexec|xlast)
+    MODE=${1:-summon}
+    case "$MODE" in
+        exec|last)
             VERBOSE=1
             ;;
-        xinstall)
+        install)
             INSTALL_ARG=$2
             VERBOSE=1
             ;;
-        xdaemon|xsummon)
+        daemon|summon|summon-last)
             ;;
-        xupdate)
+        update)
             FORCE=true
             VERBOSE=1
             ;;
@@ -341,6 +345,15 @@ start_logging()
 }
 
 tryborg()
+{
+    if [ "$MODE" = daemon ]; then
+        trywaitborg "$@"
+    else
+        borg "$@"
+    fi
+}
+
+trywaitborg()
 {
     local SEC_STARTING=0
     local SEC_DOING=0
@@ -411,14 +424,28 @@ lock_get()
     trap 'trap - INT TERM EXIT; syslog "[daemon] exorcized..."; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
 }
 
-summon_backup()
+summon-backup()
 {
     # Print log header
     print_log_header
 
     borg_create
     borg_prune
+}
 
+summon-last()
+{
+    # Print log header
+    print_log_header
+
+    out="$(cmd_last)"
+    echo "Hello master,
+
+This is $BASE, your backup servant.
+
+Please find below the summary of last backups on $BORG_REPO.
+
+$out" | eval $MAIL_INFO
 }
 
 cmd_daemon()
@@ -445,7 +472,10 @@ cmd_daemon()
 
         case "$R" in
             B)
-                summon_backup
+                summon-backup
+                ;;
+            L)
+                summon-last
                 ;;
         esac
 
@@ -485,7 +515,7 @@ cmd_install()
 
 cmd_last()
 {
-    local out=$(borg list)
+    local out=$(tryborg list)
     local sep1=$(date +"--- Now -------------------------------------------------------------- _%Y%m%d_%H%M" -d "now")
     local sep2=$(date +"--- Yesterday -------------------------------------------------------- _%Y%m%d_%H%M" -d "yesterday")
     local sep3=$(date +"--- 2 days ago ------------------------------------------------------- _%Y%m%d_%H%M" -d "2 days ago")
@@ -521,6 +551,16 @@ cmd_summon()
     [ -e $FIFOFILE ] && echo B >$FIFOFILE
 }
 
+cmd_summon-last()
+{
+    # Start logging
+    start_logging
+
+    # Summon the daemon
+    syslog "Summon the daemon: 'last!'."
+    [ -e $FIFOFILE ] && echo L >$FIFOFILE
+}
+
 # Read CLI options
 read_options "$@"
 shift $((OPTIND-1))
@@ -550,6 +590,9 @@ case $MODE in
         ;;
     summon)
         cmd_summon "$@"
+        ;;
+    summon-last)
+        cmd_summon-last "$@"
         ;;
 esac
 
