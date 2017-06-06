@@ -43,7 +43,7 @@ log()
 
 syslog()
 {
-    [ "$MODE" = daemon -o "$MODE" = wakeup ] && logger --id=$BASHPID -t $BASE "$@"
+    [ "$MODE" = daemon -o "$MODE" = summon ] && logger --id=$BASHPID -t $BASE "$@"
     log 1 "$@"
 }
 
@@ -221,14 +221,14 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|wakeup]
+Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|summon]
 
 $BASE only runs as root user, or using sudo.
 
 The modes are:
 
     daemon  DAEMON mode.
-            $BASE waits for wakeup signal. This signal triggers a backup.
+            $BASE waits for summon signal. This signal triggers a backup.
     exec ...
             EXEC mode.
             Run borg, passing the remaining parameters on the line
@@ -244,11 +244,10 @@ The modes are:
     update  UPDATE mode.
             Same as INSTALL, but does not update configuration.
             Implies flag -f. The configuration file is NOT modified.
-    wakeup  WAKEUP mode.
-            In this mode, it sends a wakeup signal to daemon in order to 
-            trigger a backup.
+    summon  SUMMON mode.
+            In this mode, it summons the daemon to trigger a backup.
 
-Without any option, $BASE runs in WAKEUP mode.
+Without any option, $BASE runs in SUMMON mode.
 
 Flags or options:
 
@@ -270,7 +269,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhsv"
-    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|wakeup]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|summon]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -304,8 +303,8 @@ read_options()
     MODE=$1
     case "x$MODE" in
         x)
-            # wakeup is the default mode
-            MODE=wakeup
+            # summon is the default mode
+            MODE=summon
             ;;
         xexec|xlast)
             VERBOSE=1
@@ -314,7 +313,7 @@ read_options()
             INSTALL_ARG=$2
             VERBOSE=1
             ;;
-        xdaemon|xwakeup)
+        xdaemon|xsummon)
             ;;
         xupdate)
             FORCE=true
@@ -442,18 +441,9 @@ lock_get()
     trap 'trap - INT TERM EXIT; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
 }
 
-lock_exit()
+summon_backup()
 {
-    exit 0
-}
-
-main()
-{
-    # TODO: check how it works on 1st install - must avoid repo init and/or the question about new repo
-    [ -d $BORG_CACHE_DIR ] || die 1 "$BORG_CACHE_DIR not found. Did you do '$BASE install' first?"
-
-    # Get the lock and print log header
-    lock_get
+    # Print log header
     print_log_header
 
     # Print a few statistics
@@ -462,15 +452,19 @@ main()
     borg_create
     borg_prune
 
-    # End logging, release the lock and exit
+    # Print log footer
     print_log_footer
-    lock_exit
 }
 
 mode_daemon()
 {
+    declare -A IGNORE
+
     # Read and check configuration
     check_install_and_read_conf
+
+    # Get the lock
+    lock_get
 
     # Start logging
     start_logging
@@ -478,15 +472,27 @@ mode_daemon()
     # Create our fifo we will listen on
     rm -f $FIFOFILE
     mkfifo -m 600 $FIFOFILE
+    exec 3<$FIFOFILE           # Keep fifo open so that writers are not blocked and don't get SIGPIPE
 
     while : ; do
-        # If in daemon mode, we wait for wake-up (WUP) signal...
-        syslog "[DAEMON] Waiting for wake-up signal..."
-        read S <$FIFOFILE
-        [ "$S" = "WUP" ] || continue
+        if ! read -t 0 R <$FIFOFILE; then                   # If no pending request
+            unset IGNORE                                    # ... clear ignore list
+            syslog "[DAEMON] Waiting for wake-up signal..." # ... notify syslog
+        fi
 
-        main &
+        read R <$FIFOFILE                                   # Get next request
+        [ -z "${IGNORE[$R]}" ] || continue                  # Skip request if in the ignore list
+
+        case "$R" in
+            B)
+                summon_backup
+                ;;
+        esac
+
+        IGNORE[$R]=x                                        # Add last request to ignore list
     done
+
+    # Release the lock - On SIGINT / SIGTERM / SIGEXIT
 }
 
 mode_exec()
@@ -554,7 +560,7 @@ mode_update()
     install_systemd
 }
 
-mode_wakeup()
+mode_summon()
 {
     # Read and check configuration
     check_install_and_read_conf
@@ -562,9 +568,9 @@ mode_wakeup()
     # Start logging
     start_logging
 
-    # Send wakeup signal
-    syslog "[WAKEUP] Sending wakeup signal to daemon."
-    [ -e $FIFOFILE ] && echo WUP >$FIFOFILE
+    # Summon the daemon
+    syslog "[SUMMON] Pray the daemon: BACKUP request."
+    [ -e $FIFOFILE ] && echo B >$FIFOFILE
 }
 
 # Read CLI options
@@ -591,8 +597,8 @@ case $MODE in
     update)
         mode_update "$@"
         ;;
-    wakeup)
-        mode_wakeup "$@"
+    summon)
+        mode_summon "$@"
         ;;
 esac
 
