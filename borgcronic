@@ -466,8 +466,6 @@ $out" | eval $MAIL_INFO
 
 cmd_daemon()
 {
-    declare -A IGNORE
-
     lock_get                                                # Get the lock
 
     start_logging                                           # Start logging
@@ -481,6 +479,8 @@ cmd_daemon()
             unset IGNORE                                    # ... clear ignore list
             syslog "[daemon] Waiting for minions..."        # ... notify syslog
         fi
+
+        declare -A IGNORE
 
         read R <$FIFOFILE                                   # Get next request
         syslog "[daemon] Got '$R' signal."
