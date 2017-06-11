@@ -165,7 +165,7 @@ install_cygwin_conf()
 		## EXCLUDES - optional
 		# EXCLUDES='--exclude */.cache'
 		# EXCLUDES+=' --exclude *.nobak'
-		EXCLUDES='--exclude-from $CONF_exclude'
+		EXCLUDES='--exclude-from $CONF_EXCLUDE'
 		
 		## MAIL - optional
 		# MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
