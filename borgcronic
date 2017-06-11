@@ -334,7 +334,9 @@ $BASE only runs as root user, or using sudo.
 
 The commands are:
 
+    backup  Starts a backup immediately.
     daemon  Starts as a daemon. $BASE waits for summoning signals.
+            This command is not supported in Cygwin.
     exec ...
             Run borg, passing the remaining parameters on the line
             to borg. This is handy to run borg using $BASE configuration.
@@ -346,9 +348,11 @@ The commands are:
     update  Same as INSTALL, but does not update configuration.
             Implies flag -f. The configuration file is NOT modified.
     summon  Summons the daemon to trigger a backup.
+            This command is not supported in Cygwin.
     summon-last
             Summons the daemon to collect archives statistics as with LAST
             command, and to send the result by mail.
+            This command is not supported in Cygwin.
 
 Without any option, $BASE executes the default command. When invoked as '$BASE', the
 default command is SUMMON. When invoked as '$BASE-COMMAND', the default command is 
@@ -372,7 +376,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] [daemon|exec ...|install REPOSITORY|last|update|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] [backup|daemon|exec ...|install REPOSITORY|last|update|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -415,7 +419,10 @@ read_options()
             VERBOSE=1
             [ -n "$INSTALL_ARG" ] || die 1 "$usage"
             ;;
+        backup)
+            ;;
         daemon|summon|summon-last)
+            [ "$OS" = "Windows_NT" ] && die 1 "Not supported in Cygwin."
             ;;
         update)
             FORCE=true
