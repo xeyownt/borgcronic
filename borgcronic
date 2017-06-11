@@ -7,8 +7,10 @@ LOGFILE=/var/log/$BASE
 CONF=/etc/$BASE.conf
 CONF_EXCLUDE=/etc/${BASE}.exclude
 LOGROTATE=/etc/logrotate.d/$BASE
-LOCKDIR=/var/lock/$BASE
-PIDFILE=/var/lock/$BASE/pid
+LOCKPREFIX=/var/lock
+[ "$OS" = "Windows_NT" ] && LOCKPREFIX="/var/run"
+LOCKDIR=$LOCKPREFIX/$BASE
+PIDFILE=$LOCKPREFIX/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
 CRON_DAILY=/etc/cron.daily/$BASE
 CRON_WEEKLY=/etc/cron.weekly/$BASE-summon-last
