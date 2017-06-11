@@ -177,6 +177,13 @@ install_cygwin_conf()
 	__END__
     chmod 644 $CONF
 
+    installcheck_does_not_exist "config exclude" $CONF_EXCLUDE || return
+
+    if [ -e $CONF_EXCLUDE ]; then
+        log 0 "Renaming old exclude file to '$CONF_EXCLUDE.old'"
+        mv $CONF_EXCLUDE $CONF_EXCLUDE.old || die 1 "Cannot rename config file to '$CONF_EXCLUDE.old'."
+    fi
+
     cat > $CONF_EXCLUDE <<- __END__
 		/cygdrive/c/Users/*/AppData/Local/Application Data
 		/cygdrive/c/Users/*/AppData/Local/Historique
@@ -290,7 +297,7 @@ install_systemd()
 print_size_summary()
 {
     log 2 "Borg repo: $(sizeof $BORG_REPO)"
-    log 2 "Borg cache: $(sizeof $BORG_CACHE_DIR)"
+    [ -d "$BORG_CACHE_DIR" ] && log 2 "Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
 check_root()
@@ -406,6 +413,7 @@ read_options()
         install)
             INSTALL_ARG=$2
             VERBOSE=1
+            [ -n "$INSTALL_ARG" ] || die 1 "$usage"
             ;;
         daemon|summon|summon-last)
             ;;
@@ -615,7 +623,7 @@ cmd_install()
     mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
 
     # Install configuration and scripts files
-    if [ "$OS" = "Windows_NT"]; then
+    if [ "$OS" = "Windows_NT" ]; then
         # Cygwin
         install_bin
         install_cygwin_conf
@@ -636,7 +644,13 @@ cmd_install()
     # Start logging
     start_logging
 
-    doit ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
+    log 0 "[INSTALL] $BASE installed successfully."
+    if [ -e "$BORG_REPO/README" -a -d "$BORG_REPO/data" ]; then
+        log 0 "[INSTALL] Borg repository already initialized. Skipping 'borg init' step..."
+    else
+        log 0 "[INSTALL] Initializing Borg repository..."
+        doit ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
+    fi
 }
 
 cmd_last()
@@ -693,7 +707,7 @@ read_options "$@"
 shift $((OPTIND-1))
 
 # Must be root
-check_root
+[ "$OS" = "Windows_NT" ] || check_root
 
 # Read and check configuration, unless if installing
 [ "$MODE" = install ] || check_install_and_read_conf
