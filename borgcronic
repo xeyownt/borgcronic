@@ -675,11 +675,16 @@ cmd_update()
     log 0 "[UPDATE] Updating $BASE."
 
     # Update configuration and scripts files
-    install_logrotate
-    install_cron_daily
-    install_cron_weekly
-    install_crond_d
-    install_systemd
+    if [ "$OS" = "Windows_NT" ]; then
+        install_bin
+    else
+        install_bin
+        install_logrotate
+        install_cron_daily
+        install_cron_weekly
+        install_crond_d
+        install_systemd
+    fi
 }
 
 cmd_summon()
