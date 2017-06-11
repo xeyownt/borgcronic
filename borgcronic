@@ -5,6 +5,7 @@ BASE=borgcronic
 PREFIX=/usr/local/bin
 LOGFILE=/var/log/$BASE
 CONF=/etc/$BASE.conf
+CONF_EXCLUDE=/etc/${BASE}.exclude
 LOGROTATE=/etc/logrotate.d/$BASE
 LOCKDIR=/var/lock/$BASE
 PIDFILE=/var/lock/$BASE/pid
@@ -111,7 +112,7 @@ install_bin()
     chmod 755 $PREFIX/$BASE
 }
 
-install_conf()
+install_linux_conf()
 {
     installcheck_does_not_exist "config" $CONF || return
 
@@ -135,12 +136,90 @@ install_conf()
 		EXCLUDES+=' --exclude */xapiandb'
 		EXCLUDES+=' --exclude */.thumbnails'
 		
-		## MAIL
+		## MAIL - optional
 		MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
 		MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
 		MAIL_ERROR='/usr/bin/mail -s"Borgcronic ERROR" root'
 	__END__
     chmod 644 $CONF
+}
+
+install_cygwin_conf()
+{
+    installcheck_does_not_exist "config" $CONF || return
+
+    if [ -e $CONF ]; then
+        log 0 "Renaming old config file to '$CONF.old'"
+        mv $CONF $CONF.old || die 1 "Cannot rename config file to '$CONF.old'."
+    fi
+
+    cat > $CONF <<- __END__
+		## BORG_REPO - mandatory
+		# BORG_REPO=username@remoteserver.com:borg
+		# BORG_REPO=/cygdrive/y
+		BORG_REPO=$BORG_REPO
+
+		## DIRS - mandatory
+		DIRS='/cygdrive/c/Users'
+
+		## EXCLUDES - optional
+		# EXCLUDES='--exclude */.cache'
+		# EXCLUDES+=' --exclude *.nobak'
+		EXCLUDES='--exclude-from $CONF_exclude'
+		
+		## MAIL - optional
+		# MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
+		# MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
+		# MAIL_ERROR='/usr/bin/mail -s"Borgcronic ERROR" root'
+		MAIL_INFO=
+		MAIL_WARNING=
+		MAIL_ERROR=
+	__END__
+    chmod 644 $CONF
+
+    cat > $CONF_EXCLUDE <<- __END__
+		/cygdrive/c/Users/*/AppData/Local/Application Data
+		/cygdrive/c/Users/*/AppData/Local/Historique
+		/cygdrive/c/Users/*/AppData/Local/History
+		/cygdrive/c/Users/*/AppData/Local/Microsoft/Windows Defender/FileTracker
+		/cygdrive/c/Users/*/AppData/Local/Microsoft/Windows/Explorer/thumbcache_*.db
+		/cygdrive/c/Users/*/AppData/Local/Microsoft/Windows/History/History.IE5/MSHist*
+		/cygdrive/c/Users/*/AppData/Local/Microsoft/Windows/Temporary Internet Files
+		/cygdrive/c/Users/*/AppData/Local/Microsoft/Windows/UsrClass.dat*
+		/cygdrive/c/Users/*/AppData/Local/Microsoft/Windows/WER
+		/cygdrive/c/Users/*/AppData/Local/Mozilla/Firefox/Profiles/*/Cache
+		/cygdrive/c/Users/*/AppData/Local/Mozilla/Firefox/Profiles/*/OfflineCache
+		/cygdrive/c/Users/*/AppData/Local/Temp
+		/cygdrive/c/Users/*/AppData/Local/Temporary Internet Files
+		/cygdrive/c/Users/*/AppData/Roaming/Microsoft/Windows/Cookies
+		/cygdrive/c/Users/*/AppData/Roaming/Microsoft/Windows/Recent
+		/cygdrive/c/Users/*/AppData/Roaming/Microsoft/Windows/Start Menu/Programmes
+		/cygdrive/c/Users/*/Application Data
+		/cygdrive/c/Users/*/Cookies
+		/cygdrive/c/Users/*/Documents/Ma musique
+		/cygdrive/c/Users/*/Documents/Mes images
+		/cygdrive/c/Users/*/Documents/Mes vidéos
+		/cygdrive/c/Users/*/Documents/My Music
+		/cygdrive/c/Users/*/Documents/My Pictures
+		/cygdrive/c/Users/*/Documents/My Videos
+		/cygdrive/c/Users/*/Local Settings
+		/cygdrive/c/Users/*/Menu Démarrer
+		/cygdrive/c/Users/*/Mes documents
+		/cygdrive/c/Users/*/Microsoft/Windows/Start Menu/Programmes
+		/cygdrive/c/Users/*/Modèles
+		/cygdrive/c/Users/*/My Documents
+		/cygdrive/c/Users/*/NetHood
+		/cygdrive/c/Users/*/ntuser.dat*
+		/cygdrive/c/Users/*/NTUSER.DAT*
+		/cygdrive/c/Users/*/PrintHood
+		/cygdrive/c/Users/*/Recent
+		/cygdrive/c/Users/*/SendTo
+		/cygdrive/c/Users/*/Start Menu
+		/cygdrive/c/Users/*/Templates
+		/cygdrive/c/Users/*/Voisinage d'impression
+		/cygdrive/c/Users/*/Voisinage réseau
+	__END__
+    chmod 644 $CONF_EXCLUDE
 }
 
 install_cron_daily()
@@ -461,6 +540,9 @@ summon-last()
 {
     # Print log header
     print_log_header
+    log 1 "Doing summon-last"
+
+    [ -n "$MAIL_INFO" -a -x "${MAIL_INFO%% *}" ] || return 1
 
     out="$(cmd_last)"
     echo "Hello master,
@@ -470,6 +552,17 @@ This is $BASE, your backup servant.
 Please find below the summary of last backups on $BORG_REPO.
 
 $out" | eval $MAIL_INFO
+}
+
+cmd_backup()
+{
+    lock_get                                                # Get the lock
+
+    start_logging                                           # Start logging
+
+    summon-backup
+
+    # Release the lock - On SIGINT / SIGTERM / SIGEXIT
 }
 
 cmd_daemon()
@@ -521,14 +614,21 @@ cmd_install()
     BORG_REPO=$INSTALL_ARG
     mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
 
-    # Unstall configuration and scripts files
-    install_bin
-    install_conf
-    install_logrotate
-    install_cron_daily
-    install_cron_weekly
-    install_crond_d
-    install_systemd
+    # Install configuration and scripts files
+    if [ "$OS" = "Windows_NT"]; then
+        # Cygwin
+        install_bin
+        install_cygwin_conf
+    else
+        # Linux
+        install_bin
+        install_linux_conf
+        install_logrotate
+        install_cron_daily
+        install_cron_weekly
+        install_crond_d
+        install_systemd
+    fi
 
     # Read and check configuration
     check_install_and_read_conf
@@ -600,6 +700,9 @@ check_root
 
 # TODO: Is current locking sufficient? Do we need more to protect log file access, cache update... ?
 case $MODE in
+    backup)
+        cmd_backup "$@"
+        ;;
     daemon)
         cmd_daemon "$@"
         ;;
