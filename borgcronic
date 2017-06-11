@@ -2,6 +2,7 @@
 
 # Common settings
 BASE=borgcronic
+PREFIX=/usr/local/bin
 LOGFILE=/var/log/$BASE
 CONF=/etc/$BASE.conf
 LOGROTATE=/etc/logrotate.d/$BASE
@@ -102,6 +103,14 @@ install_logrotate()
     fi
 }
 
+install_bin()
+{
+    installcheck_does_not_exist "binary" $PREFIX/$BASE || return
+
+    cp $0 $PREFIX/$BASE
+    chmod 755 $PREFIX/$BASE
+}
+
 install_conf()
 {
     installcheck_does_not_exist "config" $CONF || return
@@ -138,15 +147,14 @@ install_cron_daily()
 {
     installcheck_does_not_exist "cron daily job" $CRON_DAILY || return
 
-    cp $0 $CRON_DAILY
-    chmod 755 $CRON_DAILY
+    ln -sf $PREFIX/$BASE $CRON_DAILY
 }
 
 install_cron_weekly()
 {
     installcheck_does_not_exist "cron weekly job" $CRON_WEEKLY || return
 
-    ln -sf $CRON_DAILY $CRON_WEEKLY
+    ln -sf $PREFIX/$BASE $CRON_WEEKLY
 }
 
 install_crond_d()
@@ -159,7 +167,7 @@ install_crond_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * root [ -x $CRON_DAILY ] && perl -le 'sleep rand 900' && $CRON_DAILY >/dev/null 2>&1
+		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE >/dev/null 2>&1
 	__END__
     chmod 644 $CRON_D
 }
@@ -514,6 +522,7 @@ cmd_install()
     mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
 
     # Unstall configuration and scripts files
+    install_bin
     install_conf
     install_logrotate
     install_cron_daily
