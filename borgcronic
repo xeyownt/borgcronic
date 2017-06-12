@@ -130,6 +130,8 @@ install_linux_conf()
 		BORG_REPO=$BORG_REPO
 
 		## DIRS - mandatory
+		# DIRS='/home'
+		# DIRS+=' /etc'
 		DIRS='/home'
 
 		## EXCLUDES - optional
@@ -163,6 +165,9 @@ install_cygwin_conf()
 
 		## DIRS - mandatory
 		DIRS='/cygdrive/c/Users'
+		DIRS+=' /cygdrive/c/Program\\ Files'
+		DIRS+=' /cygdrive/c/Program\\ Files\\ \\(x86\\)'
+		DIRS+=' /cygdrive/c/ProgramData'
 
 		## EXCLUDES - optional
 		# EXCLUDES='--exclude */.cache'
