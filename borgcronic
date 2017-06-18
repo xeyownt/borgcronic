@@ -515,7 +515,7 @@ start_logging()
 
 tryborg()
 {
-    if [ "$MODE" = daemon -o "$MODE" = backup ]; then
+    if [ "$MODE" = daemon -o "$MODE" = devil -o "$MODE" = backup ]; then
         trywaitborg "$@"
     else
         borg "$@"
