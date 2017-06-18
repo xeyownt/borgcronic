@@ -23,7 +23,7 @@ LOGGING=
 export BORG_CACHE_DIR=/var/cache/borg
 export BORG_KEYS_DIR=/var/lib/borg/keys
 export BORG_SECURITY_DIR=/var/lib/borg/security
-BORG_LASTSUCCESSFUL=$BORG_CACHE_DIR/$BASE.success
+BORG_TS=$BORG_CACHE_DIR/$BASE-ts
 
 log()
 {
@@ -68,6 +68,27 @@ warning()
 sizeof()
 {
     du -sB1 "$@" | awk '{s+=$1} END {printf "%dM (%d)",s/(2**20),s}'
+}
+
+get_timestamp()
+{
+    LC_TIME=C date -u
+}
+
+set_op_timestamp()
+{
+    local OP=$1
+
+    get_timestamp > $BORG_TS-$OP
+}
+
+get_op_timestamp()
+{
+    local OP=$1
+
+    if [ -e $BORG_TS-$OP ]; then
+        cat $BORG_TS-$OP
+    fi
 }
 
 installcheck_does_not_exist()
@@ -335,7 +356,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhsv] [daemon|exec ...|install REPOSITORY|last|update|summon|summon-last]
+Usage: $BASE [-dfhv] [backup|daemon|devil|exec ...|install REPOSITORY|last|update|summon|summon-last]
 
 $BASE only runs as root user, or using sudo.
 
@@ -344,6 +365,8 @@ The commands are:
     backup  Starts a backup immediately.
     daemon  Starts as a daemon. $BASE waits for summoning signals.
             This command is not supported in Cygwin.
+    devil   Starts as a simpler daemon, which schedules automatically new backups
+            at regular intervals.
     exec ...
             Run borg, passing the remaining parameters on the line
             to borg. This is handy to run borg using $BASE configuration.
@@ -383,7 +406,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] [backup|daemon|exec ...|install REPOSITORY|last|update|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] [backup|daemon|devil|exec ...|install REPOSITORY|last|update|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -426,7 +449,7 @@ read_options()
             VERBOSE=1
             [ -n "$INSTALL_ARG" ] || die 1 "$usage"
             ;;
-        backup)
+        backup|devil)
             ;;
         daemon|summon|summon-last)
             [ "$OS" = "Windows_NT" ] && die 1 "Not supported in Cygwin."
@@ -482,8 +505,9 @@ trywaitborg()
 {
     local SEC_STARTING=0
     local SEC_DOING=0
+    local OP=$1
 
-    syslog Starting "'borg $1'"
+    syslog Starting "'borg $OP'"
     SEC_STARTING=$SECONDS
     while : ; do
         # Wait for the repository to show up
@@ -492,23 +516,24 @@ trywaitborg()
         done
 
         # Do action
-        syslog Doing "'borg $1'"
+        syslog Doing "'borg $OP'"
         SEC_DOING=$SECONDS
         doit borg "$@"
 
         # If warning - Tell if we got a warning?
-        [ $? -eq 1 ] && warning "borg '$1' returned a WARNING code. Please check '$LOGFILE'."
+        [ $? -eq 1 ] && warning "borg '$OP' returned a WARNING code. Please check '$LOGFILE'."
 
         # If warning or success - Exit
         [ $? -le 1 ] && break
 
         # If error - Wait then retry
-        syslog "Failed 'borg $1'"
+        syslog "Failed 'borg $OP'"
         sleep $TRY_WAIT
     done
 
-    touch $BORG_LASTSUCCESSFUL.$1
-    syslog Done "'borg $1'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
+    set_op_timestamp $OP
+
+    syslog Done "'borg $OP'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
 }
 
 borg_create()
@@ -622,6 +647,35 @@ cmd_daemon()
     done
 
     # Release the lock - On SIGINT / SIGTERM / SIGEXIT
+}
+
+cmd_devil()
+{
+    lock_get                                                # Get the lock
+
+    start_logging                                           # Start logging
+
+    local CMD=devil
+
+    while : ; do
+        TS=$(get_op_timestamp $CMD)
+        NOW=$(get_timestamp)
+        if [ -n "$TS" ]; then
+            TSEC=$(date +%s -d "$TS")
+            TSECNOW=$(date +%s -d "$NOW")
+            TSECNEXT=$((TSEC + 86400 - TSEC % 86400))       # TODO: Allow different interval
+
+            if [ $TSECNEXT -gt $TSECNOW ]; then
+                SEC=$((TSECNEXT - TSECNOW))
+                log 0 "[devil] Next backup will occur in $SEC seconds."
+                sleep $SEC
+            fi
+        fi
+
+        summon-backup
+
+        set_op_timestamp $CMD
+    done
 }
 
 cmd_exec()
@@ -738,6 +792,9 @@ case $MODE in
         ;;
     daemon)
         cmd_daemon "$@"
+        ;;
+    devil)
+        cmd_devil "$@"
         ;;
     exec)
         cmd_exec "$@"
