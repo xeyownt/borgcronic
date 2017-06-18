@@ -505,7 +505,7 @@ print_log_header()
     log 0 "####################################################################################################"
 }
 
-doit()
+do_it()
 {
     log 1 "$@"
     log 0 "===================================================================================================="
@@ -527,15 +527,6 @@ start_logging()
     fi
 }
 
-tryborg()
-{
-    if [ "$MODE" = daemon -o "$MODE" = devil -o "$MODE" = backup ]; then
-        trywaitborg "$@"
-    else
-        borg "$@"
-    fi
-}
-
 trywaitborg()
 {
     local SEC_STARTING=0
@@ -553,7 +544,7 @@ trywaitborg()
         # Do action
         syslog Doing "'borg $OP'"
         SEC_DOING=$SECONDS
-        doit borg "$@"
+        do_it borg "$@"
 
         # If warning - Tell if we got a warning?
         [ $? -eq 1 ] && warning "borg '$OP' returned a WARNING code. Please check '$LOGFILE'."
@@ -569,6 +560,15 @@ trywaitborg()
     set_op_timestamp $OP
 
     syslog Done "'borg $OP'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
+}
+
+tryborg()
+{
+    if [ "$MODE" = daemon -o "$MODE" = devil -o "$MODE" = backup ]; then
+        trywaitborg "$@"
+    else
+        borg "$@"
+    fi
 }
 
 borg_create()
@@ -752,7 +752,7 @@ cmd_install()
         log 0 "[INSTALL] Borg repository already initialized. Skipping 'borg init' step..."
     else
         log 0 "[INSTALL] Initializing Borg repository..."
-        doit ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
+        do_it ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
     fi
 }
 
