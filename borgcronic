@@ -48,7 +48,7 @@ log()
 
 syslog()
 {
-    [[ "$MODE" = daemon || "$MODE" = summon* ]] && logger --id=$BASHPID -t $BASE "$@"
+    [ "$OS" != "Windows_NT" ] && [[ "$MODE" = daemon || "$MODE" = summon* ]] && logger --id=$BASHPID -t $BASE "$@"
     log 1 "$@"
 }
 
@@ -496,7 +496,6 @@ read_options()
         backup|devil)
             ;;
         daemon|summon|summon-last)
-            [ "$OS" = "Windows_NT" ] && die 1 "Not supported in Cygwin."
             ;;
         update)
             FORCE=true
@@ -664,10 +663,12 @@ cmd_daemon()
 
     rm -f $FIFOFILE                                         # Create our fifo we will listen on
     mkfifo -m 600 $FIFOFILE
-    exec 3<>$FIFOFILE                                       # Open in/out FD on fifo...
+    [ "$OS" != "Windows_NT" ] && exec 3<>$FIFOFILE          # Open in/out FD on fifo...
                                                             # .. so writers are not blocked / SIGPIPE'd
+                                                            # [Cygwin] This does not work. 2nd request will block!
     while : ; do
-        if ! read -t 0 R <$FIFOFILE; then                   # If no pending request
+        if [ "$OS" = "Windows_NT" ] || \
+           ! read -t 0 R <$FIFOFILE; then                   # If on Cygwin or no pending request
             unset IGNORE                                    # ... clear ignore list
             syslog "[daemon] Waiting for minions..."        # ... notify syslog
         fi
