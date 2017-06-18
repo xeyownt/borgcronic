@@ -161,14 +161,18 @@ install_linux_conf()
 		EXCLUDES+=' --exclude */xapiandb'
 		EXCLUDES+=' --exclude */.thumbnails'
 
-		## LOG filter - optional
+		## LOG_FILTER - optional
 		# LOG_FILTER='sed -r "/Permission denied:|Device or resource busy:/d"'
 		LOG_FILTER=
 
-		## MAIL - optional
+		## MAIL_xxx - optional
 		MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
 		MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
 		MAIL_ERROR='/usr/bin/mail -s"Borgcronic ERROR" root'
+
+		## DEVIL_PERIOD - optional
+		# DEVIL_PERIOD=86400
+		DEVIL_PERIOD=
 	__END__
     chmod 644 $CONF
 }
@@ -199,16 +203,19 @@ install_cygwin_conf()
 		# EXCLUDES+=' --exclude *.nobak'
 		EXCLUDES='--exclude-from $CONF_EXCLUDE'
 
-		## LOG filter - optional
+		## LOG_FILTER - optional
 		LOG_FILTER='sed -r "/Permission denied:|Device or resource busy:/d"'
 
-		## MAIL - optional
+		## MAIL_xxx - optional
 		# MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
 		# MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
 		# MAIL_ERROR='/usr/bin/mail -s"Borgcronic ERROR" root'
 		MAIL_INFO=
 		MAIL_WARNING=
 		MAIL_ERROR=
+
+		## DEVIL_PERIOD - optional
+		DEVIL_PERIOD=86400
 	__END__
     chmod 644 $CONF
 
@@ -353,6 +360,7 @@ check_install_and_read_conf()
     MAIL_INFO=
     MAIL_WARNING=
     MAIL_ERROR=
+    DEVIL_PERIOD=86400
 
     . $CONF
 
@@ -361,6 +369,7 @@ check_install_and_read_conf()
     export BORG_KEYS_DIR
     export BORG_SECURITY_DIR
     [ -n "$LOG_FILTER" ] || LOG_FILTER=cat
+    [ -n "$DEVIL_PERIOD" ] || DEVIL_PERIOD=86400
 
     # Check conf
     [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty in '$CONF'."
@@ -698,7 +707,7 @@ cmd_devil()
         if [ -n "$TS" ]; then
             TSEC=$(date +%s -d "$TS")
             TSECNOW=$(date +%s -d "$NOW")
-            TSECNEXT=$((TSEC + 86400 - TSEC % 86400))       # TODO: Allow different interval
+            TSECNEXT=$((TSEC + $DEVIL_PERIOD - TSEC % $DEVIL_PERIOD ))
 
             if [ $TSECNEXT -gt $TSECNOW ]; then
                 SEC=$((TSECNEXT - TSECNOW))
