@@ -362,38 +362,59 @@ $BASE only runs as root user, or using sudo.
 
 The commands are:
 
-    backup  Starts a backup immediately.
-    daemon  Starts as a daemon. $BASE waits for summoning signals.
-            This command is not supported in Cygwin.
-    devil   Starts as a simpler daemon, which schedules automatically new backups
-            at regular intervals.
+    backup
+        Starts a backup immediately.
+
+    daemon
+        Starts as a daemon. $BASE waits for summoning signals.
+        This command is not supported in Cygwin.
+
+    devil
+        Starts as a simpler daemon, which schedules automatically new backups
+        at regular intervals.
+
     exec ...
-            Run borg, passing the remaining parameters on the line
-            to borg. This is handy to run borg using $BASE configuration.
+        Run borg, passing the remaining parameters on the line
+        to borg. This is handy to run borg using $BASE configuration.
+
     install REPOSITORY
-            Install $BASE, configuration and script files, then run
-            borg to initialize REPOSITORY. Use -f to force overwriting
-            existing files.
-    last    Print a summary of last archives found in the repository for each host.
-    update  Same as INSTALL, but does not update configuration.
-            Implies flag -f. The configuration file is NOT modified.
-    summon  Summons the daemon to trigger a backup.
-            This command is not supported in Cygwin.
+        Install $BASE, configuration and script files, then run
+        borg to initialize REPOSITORY. Use -f to force overwriting
+        existing files.
+
+    last
+        Print a summary of last archives found in the repository for each host.
+
+    update
+        Same as INSTALL, but does not update configuration.
+        Implies flag -f. The configuration file is NOT modified.
+
+    summon
+        Summons the daemon to trigger a backup.
+        This command is not supported in Cygwin.
+
     summon-last
-            Summons the daemon to collect archives statistics as with LAST
-            command, and to send the result by mail.
-            This command is not supported in Cygwin.
+        Summons the daemon to collect archives statistics as with LAST
+        command, and to send the result by mail.
+        This command is not supported in Cygwin.
 
 Without any option, $BASE executes the default command. When invoked as '$BASE', the
 default command is SUMMON. When invoked as '$BASE-COMMAND', the default command is 
 'COMMAND'. This is useful for cron jobs.
 
-Flags or options:
+Options:
 
-    -d      Run borg in dry-run mode (only for DAEMON or EXEC command).
-    -f      Force overwriting existing files in INSTALL command.
-    -h      This help.
-    -v      Increase verbose level.
+    -d
+        Run borg in dry-run mode (only for DAEMON or EXEC command).
+
+    -f
+        Force overwriting existing files in INSTALL command.
+
+    -h
+        This help.
+
+    -v
+        Increase verbose level.
 __END__
 }
 
