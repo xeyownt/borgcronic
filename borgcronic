@@ -271,6 +271,11 @@ install_cygwin_conf()
     chmod 644 $CONF_EXCLUDE
 }
 
+install_conf()
+{
+    [ "$OS" = "Windows_NT" ] && install_cygwin_conf || install_linux_conf
+}
+
 install_cron_daily()
 {
     installcheck_does_not_exist "cron daily job" $CRON_DAILY || return
@@ -285,10 +290,11 @@ install_cron_weekly()
     ln -sf $PREFIX/$BASE $CRON_WEEKLY
 }
 
-install_crond_d()
+install_linux_cron_d()
 {
-
     installcheck_does_not_exist "cron.d job" $CRON_D || return
+
+    [ -d $(dirname $CRON_D) ] || mkdir -m 755 -p $(dirname $CRON_D)
 
     cat > $CRON_D <<- __END__
 		SHELL=/bin/sh
@@ -298,6 +304,29 @@ install_crond_d()
 		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE >/dev/null 2>&1
 	__END__
     chmod 644 $CRON_D
+}
+
+install_cygwin_cron_d()
+{
+    installcheck_does_not_exist "cron.d job" $CRON_D || return
+
+    [ -d $(dirname $CRON_D) ] || mkdir -m 755 -p $(dirname $CRON_D)
+
+    cat > $CRON_D <<- __END__
+		HOME=/
+		SHELL=/bin/sh
+		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
+
+		# Start $BASE every 6 hours during daylight
+		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE >/dev/null 2>&1
+	__END__
+    chown SYSTEM:SYSTEM $CRON_D
+    chmod 644 $CRON_D
+}
+
+install_cron_d()
+{
+    [ "$OS" = "Windows_NT" ] && install_cygwin_cron_d || install_linux_cron_d
 }
 
 install_systemd()
@@ -739,15 +768,16 @@ cmd_install()
     if [ "$OS" = "Windows_NT" ]; then
         # Cygwin
         install_bin
-        install_cygwin_conf
+        install_conf
+        install_cron_d
     else
         # Linux
         install_bin
-        install_linux_conf
+        install_conf
         install_logrotate
         install_cron_daily
         install_cron_weekly
-        install_crond_d
+        install_cron_d
         install_systemd
     fi
 
@@ -790,12 +820,13 @@ cmd_update()
     # Update configuration and scripts files
     if [ "$OS" = "Windows_NT" ]; then
         install_bin
+        install_cron_d
     else
         install_bin
         install_logrotate
         install_cron_daily
         install_cron_weekly
-        install_crond_d
+        install_cron_d
         install_systemd
     fi
 }
