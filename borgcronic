@@ -160,7 +160,11 @@ install_linux_conf()
 		EXCLUDES+=' --exclude *.nobak'
 		EXCLUDES+=' --exclude */xapiandb'
 		EXCLUDES+=' --exclude */.thumbnails'
-		
+
+		## LOG filter - optional
+		# LOG_FILTER='sed -r "/Permission denied:|Device or resource busy:/d"'
+		LOG_FILTER=
+
 		## MAIL - optional
 		MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
 		MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
@@ -194,7 +198,10 @@ install_cygwin_conf()
 		# EXCLUDES='--exclude */.cache'
 		# EXCLUDES+=' --exclude *.nobak'
 		EXCLUDES='--exclude-from $CONF_EXCLUDE'
-		
+
+		## LOG filter - optional
+		LOG_FILTER='sed -r "/Permission denied:|Device or resource busy:/d"'
+
 		## MAIL - optional
 		# MAIL_INFO='/usr/bin/mail -s"Borgcronic info" root'
 		# MAIL_WARNING='/usr/bin/mail -s"Borgcronic warning" root'
@@ -342,11 +349,18 @@ check_install_and_read_conf()
     BORG_REPO=
     DIRS=
     EXCLUDES=
+    LOG_FILTER=
+    MAIL_INFO=
+    MAIL_WARNING=
+    MAIL_ERROR=
+
     . $CONF
+
     export BORG_REPO
     export BORG_CACHE_DIR
     export BORG_KEYS_DIR
     export BORG_SECURITY_DIR
+    [ -n "$LOG_FILTER" ] || LOG_FILTER=cat
 
     # Check conf
     [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty in '$CONF'."
@@ -495,7 +509,7 @@ doit()
 {
     log 1 "## $@"
     log 0 "===================================================================================================="
-    "$@"
+    "$@" |& eval $LOG_FILTER
     local RC=$?
     log 0 "===================================================================================================="
     print_size_summary
