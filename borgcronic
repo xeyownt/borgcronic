@@ -418,7 +418,6 @@ The commands are:
 
     daemon
         Starts as a daemon. $BASE waits for summoning signals.
-        This command is not supported in Cygwin.
 
     devil
         Starts as a simpler daemon, which schedules automatically new backups
@@ -442,12 +441,10 @@ The commands are:
 
     summon
         Summons the daemon to trigger a backup.
-        This command is not supported in Cygwin.
 
     summon-last
         Summons the daemon to collect archives statistics as with LAST
         command, and to send the result by mail.
-        This command is not supported in Cygwin.
 
 Without any option, $BASE executes the default command. When invoked as '$BASE', the
 default command is SUMMON. When invoked as '$BASE-COMMAND', the default command is 
