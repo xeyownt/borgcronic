@@ -15,6 +15,7 @@ CRON_DAILY=/etc/cron.daily/$BASE
 CRON_WEEKLY=/etc/cron.weekly/$BASE-summon-last
 CRON_D=/etc/cron.d/$BASE
 SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
+CYGWIN_STARTUP_SCRIPT=$BASE-devil.vbs
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 LOGGING=
 
@@ -178,7 +179,7 @@ install_linux_conf()
 
 install_cygwin_conf()
 {
-    installcheck_does_not_exist "config" $CONF || return
+    installcheck_does_not_exist "config" $CONF || return 0
     syslog "Installing config file '$CONF'."
 
     if [ -e $CONF ]; then
@@ -219,7 +220,7 @@ install_cygwin_conf()
 	__END__
     chmod 644 $CONF
 
-    installcheck_does_not_exist "config exclude" $CONF_EXCLUDE || return
+    installcheck_does_not_exist "config exclude" $CONF_EXCLUDE || return 0
     syslog "Installing config exclude file '$CONF_EXCLUDE'."
 
     if [ -e $CONF_EXCLUDE ]; then
@@ -270,6 +271,8 @@ install_cygwin_conf()
 		/cygdrive/c/Users/*/Voisinage réseau
 	__END__
     chmod 644 $CONF_EXCLUDE
+
+    return 0
 }
 
 install_conf()
@@ -323,6 +326,8 @@ install_cygwin_cron_d()
 	__END__
     chown SYSTEM:SYSTEM $CRON_D
     chmod 644 $CRON_D
+
+    return 0
 }
 
 install_cron_d()
@@ -330,7 +335,7 @@ install_cron_d()
     [ "$OS" = "Windows_NT" ] && install_cygwin_cron_d || install_linux_cron_d
 }
 
-install_systemd()
+install_linux_startup()
 {
     syslog "Installing systemd service file '$SYSTEMD_SERVICE'."
 
@@ -364,6 +369,26 @@ install_systemd()
     systemctl daemon-reload
     systemctl enable $BASE
     systemctl start $BASE
+}
+
+CYGWIN_USER_STARTUP="/cygdrive/c/Users/$USERNAME/AppData/Roaming/Microsoft/Windows/Start Menu/Programs"
+install_cygwin_startup()
+{
+    syslog "Installing startup script '$PREFIX/$CYGWIN_STARTUP_SCRIPT'."
+    cp "cygwin/$CYGWIN_STARTUP_SCRIPT" $PREFIX/
+
+    syslog "Installing shortcut '$CYGWIN_STARTUP_SCRIPT' in user Startup Programs group."
+    mkshortcut --name="$CYGWIN_STARTUP_SCRIPT" -P "$PREFIX/$CYGWIN_STARTUP_SCRIPT"
+    mv "$CYGWIN_USER_STARTUP/$CYGWIN_STARTUP_SCRIPT.lnk" "$CYGWIN_USER_STARTUP/Startup/"
+
+    cygstart "$PREFIX/$CYGWIN_STARTUP_SCRIPT"
+
+    return 0
+}
+
+install_startup()
+{
+    [ "$OS" = "Windows_NT" ] && install_cygwin_startup || install_linux_startup
 }
 
 print_size_summary()
@@ -759,7 +784,8 @@ cmd_install()
         # Cygwin
         install_bin
         install_conf
-        install_cron_d
+        # install_cron_d                         # TODO: Allow choosing between daemon/devil on cygwin?
+        install_startup
     else
         # Linux
         install_bin
@@ -768,7 +794,7 @@ cmd_install()
         install_cron_daily
         install_cron_weekly
         install_cron_d
-        install_systemd
+        install_startup
     fi
 
     # Read and check configuration
