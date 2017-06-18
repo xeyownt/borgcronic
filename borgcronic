@@ -96,10 +96,9 @@ installcheck_does_not_exist()
     local FILE=$2
 
     if [ -z "$FORCE" -a -e $FILE ]; then
-        warning "Found $DESC file '$FILE', not overwriting (use '-f' to force or '-u' to update)."
+        warning "Found $DESC file '$FILE', not overwriting (use '-f' to force)."
         return 1
     fi
-    syslog "Installing $DESC file '$FILE'."
 
     return 0
 }
@@ -107,7 +106,7 @@ installcheck_does_not_exist()
 install_logrotate()
 {
     if [ -d $(dirname $LOGROTATE) ]; then
-        installcheck_does_not_exist "logrotate" $LOGROTATE || return
+        syslog "Installing logrotate file '$LOGROTATE'."
 
         cat > $LOGROTATE <<- __END__
 			$LOGFILE
@@ -128,7 +127,7 @@ install_logrotate()
 
 install_bin()
 {
-    installcheck_does_not_exist "binary" $PREFIX/$BASE || return
+    syslog "Installing binary file '$PREFIX/$BASE'."
 
     cp $0 $PREFIX/$BASE
     chmod 755 $PREFIX/$BASE
@@ -137,6 +136,7 @@ install_bin()
 install_linux_conf()
 {
     installcheck_does_not_exist "config" $CONF || return
+    syslog "Installing config file '$CONF'."
 
     if [ -e $CONF ]; then
         log 0 "Renaming old config file to '$CONF.old'"
@@ -179,6 +179,7 @@ install_linux_conf()
 install_cygwin_conf()
 {
     installcheck_does_not_exist "config" $CONF || return
+    syslog "Installing config file '$CONF'."
 
     if [ -e $CONF ]; then
         log 0 "Renaming old config file to '$CONF.old'"
@@ -219,6 +220,7 @@ install_cygwin_conf()
     chmod 644 $CONF
 
     installcheck_does_not_exist "config exclude" $CONF_EXCLUDE || return
+    syslog "Installing config exclude file '$CONF_EXCLUDE'."
 
     if [ -e $CONF_EXCLUDE ]; then
         log 0 "Renaming old exclude file to '$CONF_EXCLUDE.old'"
@@ -277,21 +279,21 @@ install_conf()
 
 install_cron_daily()
 {
-    installcheck_does_not_exist "cron daily job" $CRON_DAILY || return
+    syslog "Installing cron daily job file '$CRON_DAILY'."
 
     ln -sf $PREFIX/$BASE $CRON_DAILY
 }
 
 install_cron_weekly()
 {
-    installcheck_does_not_exist "cron weekly job" $CRON_WEEKLY || return
+    syslog "Installing cron weekly job file '$CRON_WEEKLY'."
 
     ln -sf $PREFIX/$BASE $CRON_WEEKLY
 }
 
 install_linux_cron_d()
 {
-    installcheck_does_not_exist "cron.d job" $CRON_D || return
+    syslog "Installing cron.d job file '$CRON_D'."
 
     [ -d $(dirname $CRON_D) ] || mkdir -m 755 -p $(dirname $CRON_D)
 
@@ -307,7 +309,7 @@ install_linux_cron_d()
 
 install_cygwin_cron_d()
 {
-    installcheck_does_not_exist "cron.d job" $CRON_D || return
+    syslog "Installing cron.d job file '$CRON_D'."
 
     [ -d $(dirname $CRON_D) ] || mkdir -m 755 -p $(dirname $CRON_D)
 
@@ -330,7 +332,7 @@ install_cron_d()
 
 install_systemd()
 {
-    installcheck_does_not_exist "systemd service" $SYSTEMD_SERVICE || return
+    syslog "Installing systemd service file '$SYSTEMD_SERVICE'."
 
     # Stop service if running
     systemctl is-active $BASE >/dev/null && systemctl stop $BASE
@@ -407,7 +409,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhv] [backup|daemon|devil|exec ...|install REPOSITORY|last|update|summon|summon-last]
+Usage: $BASE [-dfhv] [backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last]
 
 $BASE only runs as root user, or using sudo.
 
@@ -430,14 +432,10 @@ The commands are:
     install REPOSITORY
         Install $BASE, configuration and script files, then run
         borg to initialize REPOSITORY. Use -f to force overwriting
-        existing files.
+        existing configuration files.
 
     last
         Print a summary of last archives found in the repository for each host.
-
-    update
-        Same as INSTALL, but does not update configuration.
-        Implies flag -f. The configuration file is NOT modified.
 
     summon
         Summons the daemon to trigger a backup.
@@ -475,7 +473,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] [backup|daemon|devil|exec ...|install REPOSITORY|last|update|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] [backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -521,10 +519,6 @@ read_options()
         backup|devil)
             ;;
         daemon|summon|summon-last)
-            ;;
-        update)
-            FORCE=true
-            VERBOSE=1
             ;;
         *)
             die 1 "$usage"
@@ -809,24 +803,6 @@ cmd_last()
         | sed -r '/^---/{s/_.*//; s/^|$/\n/g; b}; s/\[.*//'
 }
 
-cmd_update()
-{
-    log 0 "[UPDATE] Updating $BASE."
-
-    # Update configuration and scripts files
-    if [ "$OS" = "Windows_NT" ]; then
-        install_bin
-        install_cron_d
-    else
-        install_bin
-        install_logrotate
-        install_cron_daily
-        install_cron_weekly
-        install_cron_d
-        install_systemd
-    fi
-}
-
 cmd_summon()
 {
     # Start logging
@@ -876,9 +852,6 @@ case $MODE in
         ;;
     last)
         cmd_last "$@"
-        ;;
-    update)
-        cmd_update "$@"
         ;;
     summon)
         cmd_summon "$@"
