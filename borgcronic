@@ -507,7 +507,7 @@ print_log_header()
 
 doit()
 {
-    log 1 "## $@"
+    log 1 "$@"
     log 0 "===================================================================================================="
     "$@" |& eval $LOG_FILTER
     local RC=$?
@@ -702,7 +702,7 @@ cmd_devil()
 
             if [ $TSECNEXT -gt $TSECNOW ]; then
                 SEC=$((TSECNEXT - TSECNOW))
-                log 0 "[devil] Next backup will occur in $SEC seconds."
+                syslog "[devil] Next backup will occur in $SEC seconds."
                 sleep $SEC
             fi
         fi
