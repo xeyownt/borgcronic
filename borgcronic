@@ -7,8 +7,7 @@ LOGFILE=/var/log/$BASE
 CONF=/etc/$BASE.conf
 CONF_EXCLUDE=/etc/${BASE}.exclude
 LOGROTATE=/etc/logrotate.d/$BASE
-LOCKPREFIX=/var/lock
-[ "$OS" = "Windows_NT" ] && LOCKPREFIX="/var/run"
+[ "$OS" = "Windows_NT" ] && LOCKPREFIX="/var/run" || LOCKPREFIX=/var/lock
 LOCKDIR=$LOCKPREFIX/$BASE
 PIDFILE=$LOCKPREFIX/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
