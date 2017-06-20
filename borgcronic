@@ -756,6 +756,7 @@ cmd_devil()
 
             if [ $TSECNEXT -gt $TSECNOW ]; then
                 SEC=$((TSECNEXT - TSECNOW))
+                SEC=$((SEC + 300 + RANDOM % 900))           # Fixed (not at boot) + random delay (spread load)
                 syslog "[devil] Next backup will occur in $SEC seconds."
                 sleep $SEC
             fi
