@@ -356,7 +356,7 @@ install_linux_startup()
 		Group=root
 		UMask=022
 
-		ExecStart=$CRON_DAILY daemon
+		ExecStart=$PREFIX/$BASE daemon
 
 		Restart=on-failure
 
