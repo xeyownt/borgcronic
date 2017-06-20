@@ -11,7 +11,7 @@ LOGROTATE=/etc/logrotate.d/$BASE
 LOCKDIR=$LOCKPREFIX/$BASE
 PIDFILE=$LOCKPREFIX/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
-CRON_DAILY=/etc/cron.daily/$BASE
+CRON_DAILY=/etc/cron.daily/$BASE-summon
 CRON_WEEKLY=/etc/cron.weekly/$BASE-summon-last
 CRON_D=/etc/cron.d/$BASE
 SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
@@ -285,6 +285,8 @@ install_cron_daily()
     syslog "Installing cron daily job file '$CRON_DAILY'."
 
     ln -sf $PREFIX/$BASE $CRON_DAILY
+
+    rm -f ${CRON_DAILY%%-summon}                          # TEMPORARY: Remove old cron daily
 }
 
 install_cron_weekly()
@@ -305,7 +307,7 @@ install_linux_cron_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE >/dev/null 2>&1
+		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE-summon >/dev/null 2>&1
 	__END__
     chmod 644 $CRON_D
 }
@@ -322,7 +324,7 @@ install_cygwin_cron_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE >/dev/null 2>&1
+		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE-summon >/dev/null 2>&1
 	__END__
     chown SYSTEM:SYSTEM $CRON_D
     chmod 644 $CRON_D
@@ -434,7 +436,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhv] [backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last]
+Usage: $BASE [-dfhv] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last
 
 $BASE only runs as root user, or using sudo.
 
@@ -470,7 +472,7 @@ The commands are:
         command, and to send the result by mail.
 
 Without any option, $BASE executes the default command. When invoked as '$BASE', the
-default command is SUMMON. When invoked as '$BASE-COMMAND', the default command is 
+default command is to print usage. When invoked as '$BASE-COMMAND', the default command is 
 'COMMAND'. This is useful for cron jobs.
 
 Options:
@@ -498,7 +500,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] [backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last]."$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last"$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -529,7 +531,7 @@ read_options()
     # Extract default command from invocation string
     BASENAME=$(basename $0)
     MODE=${1:-${BASENAME##$BASE-}}
-    [ $MODE = $BASE ] && MODE=summon
+    [ $MODE = $BASE ] && die 1 "$usage"
 
     # Process command
     case "$MODE" in
