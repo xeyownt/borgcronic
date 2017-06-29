@@ -307,7 +307,7 @@ install_linux_cron_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE-summon >/dev/null 2>&1
+		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE summon >/dev/null 2>&1
 	__END__
     chmod 644 $CRON_D
 }
@@ -324,7 +324,7 @@ install_cygwin_cron_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE-summon >/dev/null 2>&1
+		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE summon >/dev/null 2>&1
 	__END__
     chown SYSTEM:SYSTEM $CRON_D
     chmod 644 $CRON_D
