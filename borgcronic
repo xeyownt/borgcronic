@@ -286,7 +286,7 @@ install_cron_daily()
 
     ln -sf $PREFIX/$BASE $CRON_DAILY
 
-    rm -f ${CRON_DAILY%%-summon} ${CRON_DAILY%%-backup}   # TEMPORARY: Remove old cron daily
+    rm -f ${CRON_DAILY%%-summon-backup} ${CRON_DAILY%%-backup}   # TEMPORARY: Remove old cron daily
 }
 
 install_cron_weekly()
