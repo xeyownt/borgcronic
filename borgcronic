@@ -17,7 +17,7 @@ LOGROTATE=/etc/logrotate.d/$BASE
 LOCKDIR=$LOCKPREFIX/$BASE
 PIDFILE=$LOCKPREFIX/$BASE/pid
 FIFOFILE=/var/run/$BASE.fifo
-CRON_DAILY=/etc/cron.daily/$BASE-summon
+CRON_DAILY=/etc/cron.daily/$BASE-summon-backup
 CRON_WEEKLY=/etc/cron.weekly/$BASE-summon-last
 CRON_D=/etc/cron.d/$BASE
 SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
@@ -286,7 +286,7 @@ install_cron_daily()
 
     ln -sf $PREFIX/$BASE $CRON_DAILY
 
-    rm -f ${CRON_DAILY%%-summon}                          # TEMPORARY: Remove old cron daily
+    rm -f ${CRON_DAILY%%-summon} ${CRON_DAILY%%-backup}   # TEMPORARY: Remove old cron daily
 }
 
 install_cron_weekly()
@@ -307,7 +307,7 @@ install_linux_cron_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE summon >/dev/null 2>&1
+		5 11-23/6 * * * root [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE summon-backup >/dev/null 2>&1
 	__END__
     chmod 644 $CRON_D
 }
@@ -324,7 +324,7 @@ install_cygwin_cron_d()
 		PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 
 		# Start $BASE every 6 hours during daylight
-		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE summon >/dev/null 2>&1
+		5 11-23/6 * * * SYSTEM [ -x $PREFIX/$BASE ] && perl -le 'sleep rand 900' && $PREFIX/$BASE summon-backup >/dev/null 2>&1
 	__END__
     chown SYSTEM:SYSTEM $CRON_D
     chmod 644 $CRON_D
@@ -395,8 +395,8 @@ install_startup()
 
 print_size_summary()
 {
-    log 2 "Borg repo: $(sizeof $BORG_REPO)"
-    [ -d "$BORG_CACHE_DIR" ] && log 2 "Borg cache: $(sizeof $BORG_CACHE_DIR)"
+    log 1 "Borg repo: $(sizeof $BORG_REPO)"
+    [ -d "$BORG_CACHE_DIR" ] && log 1 "Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
 
 check_root()
@@ -436,7 +436,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhv] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last
+Usage: $BASE [-dfhv] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-backup|summon-last
 
 $BASE only runs as root user, or using sudo.
 
@@ -465,6 +465,7 @@ The commands are:
         Print a summary of last archives found in the repository for each host.
 
     summon
+    summon-backup
         Summons the daemon to trigger a backup.
 
     summon-last
@@ -500,7 +501,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-last"$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-backup|summon-last"$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -545,7 +546,7 @@ read_options()
             ;;
         backup|devil)
             ;;
-        daemon|summon|summon-last)
+        daemon|summon|summon-backup|summon-last)
             ;;
         *)
             die 1 "$usage"
@@ -679,7 +680,7 @@ lock_get()
     trap 'trap - INT TERM EXIT; syslog "[daemon] exorcized..."; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
 }
 
-summon-backup()
+execute-backup()
 {
     # Print log header
     print_log_header
@@ -687,11 +688,10 @@ summon-backup()
     borg_create && borg_prune
 }
 
-summon-last()
+execute-last()
 {
     # Print log header
     print_log_header
-    log 1 "Doing summon-last"
 
     [ -n "$MAIL_INFO" -a -x "${MAIL_INFO%% *}" ] || return 1
 
@@ -711,7 +711,7 @@ cmd_backup()
 
     start_logging B                                         # Start logging
 
-    summon-backup
+    execute-backup
 
     # Release the lock - On SIGINT / SIGTERM / SIGEXIT
 }
@@ -742,10 +742,10 @@ cmd_daemon()
 
         case "$R" in
             B)
-                summon-backup
+                execute-backup
                 ;;
             L)
-                summon-last
+                execute-last
                 ;;
         esac
 
@@ -779,7 +779,7 @@ cmd_devil()
             fi
         fi
 
-        summon-backup
+        execute-backup
 
         set_op_timestamp $CMD
     done
@@ -847,13 +847,13 @@ cmd_last()
         | sed -r '/^---/{s/_.*//; s/^|$/\n/g; b}; s/\[.*//'
 }
 
-cmd_summon()
+cmd_summon-backup()
 {
     # Start logging
     start_logging SB
 
     # Summon the daemon
-    syslog "Summon the daemon: 'backup!'."
+    syslog "Summon the daemon. Sending signal 'backup'..."
     [ -e $FIFOFILE ] && echo B >$FIFOFILE
 }
 
@@ -863,7 +863,7 @@ cmd_summon-last()
     start_logging SL
 
     # Summon the daemon
-    syslog "Summon the daemon: 'last!'."
+    syslog "Summon the daemon. Sending signal 'last'..."
     [ -e $FIFOFILE ] && echo L >$FIFOFILE
 }
 
@@ -897,8 +897,8 @@ case $MODE in
     last)
         cmd_last "$@"
         ;;
-    summon)
-        cmd_summon "$@"
+    summon | summon-backup)
+        cmd_summon-backup "$@"
         ;;
     summon-last)
         cmd_summon-last "$@"
