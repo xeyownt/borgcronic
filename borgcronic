@@ -38,7 +38,7 @@ log()
             >&2 echo "$LOG_PREFIX$@"
             ;;
         1)
-            >&2 echo "${LOG_PREFIX:[?] } $(date): $@"
+            >&2 echo "${LOG_PREFIX:-[?] } $(date): $@"
             ;;
         *)
             >&2 echo "Unknown level '$LVL'"
