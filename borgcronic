@@ -559,7 +559,7 @@ print_log_header()
 {
     log 0 "####################################################################################################"
     log 0 "# Borg variables:"
-    for v in $(env|perl -lne 'print for /^BORG_[A-Z_]*/'); do        # Can't use ${!BORG_*} because we only want exported variables
+    for v in $(env|perl -lne 'print for /^BORG_[A-Z_]*/g'); do        # Can't use ${!BORG_*} because we only want exported variables
         log 0 "    $v=${!v}"
     done
 }
