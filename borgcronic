@@ -586,6 +586,10 @@ trywaitborg()
     local SEC_STARTING=0
     local SEC_DOING=0
     local OP=$1
+    local FAIL_COUNT=0
+    local FAIL_MAX=5
+    local FAIL_WAIT=0
+    local RC
 
     syslog Starting "'borg $OP'"
     SEC_STARTING=$SECONDS
@@ -599,21 +603,28 @@ trywaitborg()
         syslog Doing "'borg $OP'"
         SEC_DOING=$SECONDS
         do_it borg "$@"
+        RC=$?
 
         # If warning - Tell if we got a warning?
-        [ $? -eq 1 ] && warning "borg '$OP' returned a WARNING code. Please check '$LOGFILE'."
+        [ $RC -eq 1 ] && warning "'borg $OP' returned a WARNING code. Please check '$LOGFILE'."
 
         # If warning or success - Exit
-        [ $? -le 1 ] && break
+        [ $RC -le 1 ] && break
 
-        # If error - Wait then retry
-        syslog "Failed 'borg $OP'"
+        # If error - Wait then retry at most FAILMAX times
+        ((FAIL_COUNT++))
+        syslog "FAIL -- 'borg $OP' failed. Retrying at most $FAIL_MAX times ($FAIL_COUNT/$FAIL_MAX)."
+        [ $FAIL_COUNT < $FAIL_MAX ] || break
+
+        ((FAIL_WAIT+=TRY_WAIT))
         sleep $TRY_WAIT
     done
 
-    set_op_timestamp $OP
+    [ $FAILCOUNT < $FAILMAX ] && set_op_timestamp $OP || set_op_timestamp $OP.fail
 
-    syslog Done "'borg $OP'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
+    syslog "Done 'borg $OP'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
+
+    return RC
 }
 
 tryborg()
@@ -668,8 +679,7 @@ summon-backup()
     # Print log header
     print_log_header
 
-    borg_create
-    borg_prune
+    borg_create && borg_prune
 }
 
 summon-last()
