@@ -1,5 +1,11 @@
 #! /bin/bash
 
+# Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
+# See also in borgcronic.conf
+export BORG_CACHE_DIR=/var/cache/borg
+export BORG_KEYS_DIR=/var/lib/borg/keys
+export BORG_SECURITY_DIR=/var/lib/borg/security
+
 # Common settings
 BASE=borgcronic
 PREFIX=/usr/local/bin
@@ -18,11 +24,6 @@ SYSTEMD_SERVICE=/etc/systemd/system/$BASE.service
 CYGWIN_STARTUP_SCRIPT=$BASE-devil.vbs
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 LOGGING=
-
-# Borg environment variables (see https://borgbackup.readthedocs.io/en/stable/usage.html)
-export BORG_CACHE_DIR=/var/cache/borg
-export BORG_KEYS_DIR=/var/lib/borg/keys
-export BORG_SECURITY_DIR=/var/lib/borg/security
 BORG_TS=$BORG_CACHE_DIR/$BASE-ts
 
 log()
@@ -557,6 +558,11 @@ read_options()
 print_log_header()
 {
     log 0 "####################################################################################################"
+    log 0 "# Borg variables:"
+    log 0 "# - BORG_REPO         = $BORG_REPO"
+    log 0 "# - BORG_CACHE_DIR    = $BORG_CACHE_DIR"
+    log 0 "# - BORG_KEYS_DIR     = $BORG_KEYS_DIR"
+    log 0 "# - BORG_SECURITY_DIR = $BORG_SECURITY_DIR"
 }
 
 do_it()
