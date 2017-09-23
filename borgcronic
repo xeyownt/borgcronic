@@ -25,21 +25,20 @@ CYGWIN_STARTUP_SCRIPT=$BASE-devil.vbs
 TRY_WAIT=120               # (seconds) Delay to wait before trying again
 LOGGING=
 BORG_TS=$BORG_CACHE_DIR/$BASE-ts
+LOG_PREFIX=
 
 log()
 {
     LVL=$1
     shift
     [ -n "$LOGGING" ] || LVL=0
+    [ -n "$LOGGING" ] || LOG_PREFIX=
     case "$LVL" in
         0)
-            >&2 echo "$@"
+            >&2 echo "$LOG_PREFIX$@"
             ;;
         1)
-            >&2 echo "# $(date): $@"
-            ;;
-        2)
-            >&2 echo "## $@"
+            >&2 echo "${LOG_PREFIX:[?] } $(date): $@"
             ;;
         *)
             >&2 echo "Unknown level '$LVL'"
@@ -578,6 +577,7 @@ do_it()
 start_logging()
 {
     LOGGING=true
+    LOG_PREFIX="[$1] "
     [ -d $(dirname $LOGFILE) ] || mkdir -p $(dirname $LOGFILE)
     if [ $VERBOSE -ge 1 ]; then
         exec > >(tee -a $LOGFILE ) 2>&1
@@ -709,7 +709,7 @@ cmd_backup()
 {
     lock_get                                                # Get the lock
 
-    start_logging                                           # Start logging
+    start_logging B                                         # Start logging
 
     summon-backup
 
@@ -720,7 +720,7 @@ cmd_daemon()
 {
     lock_get                                                # Get the lock
 
-    start_logging                                           # Start logging
+    start_logging D                                         # Start logging
 
     rm -f $FIFOFILE                                         # Create our fifo we will listen on
     mkfifo -m 600 $FIFOFILE
@@ -759,7 +759,7 @@ cmd_devil()
 {
     lock_get                                                # Get the lock
 
-    start_logging                                           # Start logging
+    start_logging d                                         # Start logging
 
     local CMD=devil
 
@@ -819,7 +819,7 @@ cmd_install()
     check_install_and_read_conf
 
     # Start logging
-    start_logging
+    start_logging I
 
     log 0 "[INSTALL] $BASE installed successfully."
     if [ -e "$BORG_REPO/README" -a -d "$BORG_REPO/data" ]; then
@@ -850,7 +850,7 @@ cmd_last()
 cmd_summon()
 {
     # Start logging
-    start_logging
+    start_logging SB
 
     # Summon the daemon
     syslog "Summon the daemon: 'backup!'."
@@ -860,7 +860,7 @@ cmd_summon()
 cmd_summon-last()
 {
     # Start logging
-    start_logging
+    start_logging SL
 
     # Summon the daemon
     syslog "Summon the daemon: 'last!'."
