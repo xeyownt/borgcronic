@@ -620,13 +620,13 @@ trywaitborg()
         # If error - Wait then retry at most FAILMAX times
         ((FAIL_COUNT++))
         syslog "FAIL -- 'borg $OP' failed. Retrying at most $FAIL_MAX times ($FAIL_COUNT/$FAIL_MAX)."
-        [ $FAIL_COUNT < $FAIL_MAX ] || break
+        [ $FAIL_COUNT -lt $FAIL_MAX ] || break
 
         ((FAIL_WAIT+=TRY_WAIT))
         sleep $TRY_WAIT
     done
 
-    [ $FAILCOUNT < $FAILMAX ] && set_op_timestamp $OP || set_op_timestamp $OP.fail
+    [ $FAIL_COUNT -lt $FAIL_MAX ] && set_op_timestamp $OP || set_op_timestamp $OP.fail
 
     syslog "Done 'borg $OP'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
 
