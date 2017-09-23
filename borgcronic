@@ -630,7 +630,7 @@ trywaitborg()
 
     syslog "Done 'borg $OP'" "(total $((SECONDS-SEC_STARTING))s, real $((SECONDS-SEC_DOING))s)"
 
-    return RC
+    return $RC
 }
 
 tryborg()
