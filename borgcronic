@@ -472,9 +472,8 @@ The commands are:
         Summons the daemon to collect archives statistics as with LAST
         command, and to send the result by mail.
 
-Without any option, $BASE executes the default command. When invoked as '$BASE', the
-default command is to print usage. When invoked as '$BASE-COMMAND', the default command is 
-'COMMAND'. This is useful for cron jobs.
+When invoked as '$BASE-COMMAND', the default command is 'COMMAND'. This is useful for 
+cron jobs.
 
 Options:
 
