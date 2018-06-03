@@ -436,7 +436,7 @@ check_install_and_read_conf()
 usage_help()
 {
     cat <<- __END__
-Usage: $BASE [-dfhv] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-backup|summon-last
+Usage: $BASE [-dfhv] backup|daemon|devil|exec ...|install [REPOSITORY]|last|summon|summon-backup|summon-last
 
 $BASE only runs as root user, or using sudo.
 
@@ -456,10 +456,11 @@ The commands are:
         Run borg, passing the remaining parameters on the line
         to borg. This is handy to run borg using $BASE configuration.
 
-    install REPOSITORY
+    install [REPOSITORY]
         Install $BASE, configuration and script files, then run
         borg to initialize REPOSITORY. Use -f to force overwriting
-        existing configuration files.
+        existing configuration files. REPOSITORY can be omitted if a configuration
+        file exists already.
 
     last
         Print a summary of last archives found in the repository for each host.
@@ -500,7 +501,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install REPOSITORY|last|summon|summon-backup|summon-last"$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install [REPOSITORY]|last|summon|summon-backup|summon-last"$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -541,7 +542,6 @@ read_options()
         install)
             INSTALL_ARG=$2
             VERBOSE=1
-            [ -n "$INSTALL_ARG" ] || die 1 "$usage"
             ;;
         backup|devil)
             ;;
@@ -793,7 +793,14 @@ cmd_install()
 {
     log 0 "[INSTALL] Installing $BASE."
 
-    BORG_REPO=$INSTALL_ARG
+    if [ -n "$INSTALL_ARG" ]; then
+        BORG_REPO=$INSTALL_ARG
+    else
+        [ -e $CONF ] || die 1 "No REPOSITORY given and '$CONF' not found.'"
+        . $CONF
+        [ -n "$BORG_REPO" ] || die 1 "No BORG_REPO found in '$CONF'. Please delete it and restart.'"
+    fi
+
     mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
 
     # Install configuration and scripts files
