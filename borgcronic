@@ -643,7 +643,7 @@ tryborg()
 
 borg_create()
 {
-    tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
+    echo y | tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
         ::'{hostname}_{now:%Y%m%d_%H%M}'                                \
         $DIRS                                                           \
         $EXCLUDES
