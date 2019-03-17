@@ -646,7 +646,11 @@ borg_create()
     echo y | tryborg create ${DRYRUN:+--dry-run} -v --stats -x --compression lz4 \
         ::'{hostname}_{now:%Y%m%d_%H%M}'                                \
         $DIRS                                                           \
-        $EXCLUDES
+        $EXCLUDES                                                       \
+        --exclude /dev --exclude /proc --exclude /sys --exclude /tmp --exclude /run \
+        --exclude "$BORG_CACHE_DIR" --exclude "$BORG_KEYS_DIR" --exclude "$BORG_SECURITY_DIR"
+    # We exclude some directories in case root partition is backed up. 
+    # Ideally we should exclude $BORG_REPO. For now we assume it is excluded with -x.
 }
 
 borg_prune()
