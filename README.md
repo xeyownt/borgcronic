@@ -22,4 +22,4 @@ After editing the configuration, the daemon must be restarted:
 
 ## Extract an archive
 
-    sudo borgcronic exec extract /my/path/to/borg::machine_20190101_1234 /home/myuser
+    sudo borgcronic exec extract /my/path/to/borg::machine_20190101_1234 home/myuser
