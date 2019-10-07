@@ -22,4 +22,5 @@ After editing the configuration, the daemon must be restarted:
 
 ## Extract an archive
 
+    # Note: path DO NOT start with a trailing /
     sudo borgcronic exec extract /my/path/to/borg::machine_20190101_1234 home/myuser

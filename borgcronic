@@ -489,6 +489,16 @@ Options:
 
     -v
         Increase verbose level.
+
+Examples:
+
+    # LIST all archives
+    sudo borgcronic list
+
+    # EXTRACT some path from an archive
+    # Note: path DO NOT start with a trailing '/'
+    sudo borgcronic exec extract /my/path/to/borg::machine_20190101_1234 home/myuser
+
 __END__
 }
 
