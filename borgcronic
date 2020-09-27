@@ -91,6 +91,69 @@ get_op_timestamp()
     fi
 }
 
+case $MACHTYPE in 
+    *"cygwin") HOST_MACH="cygwin" ;;
+    *)         HOST_MACH="linux" ;;
+esac
+
+function ishostavail()
+{
+    if [ "$HOST_MACH" = "cygwin" ]; then
+        ping $1 1 1 2>/dev/null | grep -q "1 packets received"
+    else
+        ping -c 1 -W 1 $1 2>/dev/null >/dev/null
+    fi
+    # nmap -sP $1 2>/dev/null | grep -q "1 host up"    # Too slow, does not always detect hosts
+}
+
+#Translate a path or ssh hostname into hostname
+#
+#Params:
+# NAME     Path or ssh hostname
+function ssh_gethost()
+{
+    local NAME=$1
+    if [[ $NAME == */* ]]; then
+        echo "localhost"
+    else
+        SSH_CONFIG="$(< ~/.ssh/config sed -rn 's/#.*//; s/ +/ /g; s/[hH]ost/host/; s/[nN]ame/name/; /host |hostname/p'|sed -r ':a /host/N; /hostname/!b a; {s/\n *hostname/ hostname/; p; d}')"
+        REMOTE=$(echo "$SSH_CONFIG" | perl -lne 'print for / '"$NAME"' .*hostname +(.*)/g')
+        if [ -z "$REMOTE" ]; then
+            REMOTE=$NAME
+        fi
+        echo "$REMOTE"
+    fi
+}
+
+#Convert a remote url to [ssh] hostname
+#
+# Supported remote url (as output by 'git remote -v'):
+#
+#   sshhost1:work/_git/keccak/CryptoDocuments
+#   ssh://host2/srv/git/CryptoDocuments.git
+#   sshhost3:private/git/CryptoDocuments.git
+#   /media/NXP/CryptoDocuments.git
+#   git://git.host5.org/project
+#   git@host6.local:/home/localuser
+#   git@host7:git/repo.git
+#   sshhost8:private/git/project.git
+#   /media/usbstick/myproject.git
+#   ssh://host10/srv/git/myproject.git
+#
+#Params:
+# URL    remote url
+function url_to_hostname()
+{
+    local URL=$1
+    if [ -n "$URL" ]; then
+        sed -r '/:/!s/.*/localhost/; s!(ssh|git|http|https)://([^/]+)!\2:!g; s/^(.*@)?([\/.a-zA-Z0-9_-]+):.*/\2/g' <<< "$URL"
+    fi
+}
+
+
+
+
+
 installcheck_does_not_exist()
 {
     local DESC=$1
@@ -148,6 +211,7 @@ install_linux_conf()
 		## BORG_REPO - mandatory
 		# BORG_REPO=username@remoteserver.com:borg
 		# BORG_REPO=/smb/remoteserver/borg
+		# BORG_REPO=borgserver:/volume1/homes/borg
 		BORG_REPO=$BORG_REPO
 
 		## DIRS - mandatory
@@ -191,6 +255,7 @@ install_cygwin_conf()
 		## BORG_REPO - mandatory
 		# BORG_REPO=username@remoteserver.com:borg
 		# BORG_REPO=/cygdrive/y
+		# BORG_REPO=borgserver:/volume1/homes/borg
 		BORG_REPO=$BORG_REPO
 
 		## DIRS - mandatory
@@ -609,8 +674,8 @@ trywaitborg()
     syslog Starting "'borg $OP'"
     SEC_STARTING=$SECONDS
     while : ; do
-        # Wait for the repository to show up
-        while ! [ -f $BORG_REPO/README ]; do
+        # Wait for the repository to show up - MUST NOT when using SSH...
+        while ! ishostavail $(ssh_gethost $(url_to_hostname $BORG_REPO)); do
             sleep $TRY_WAIT
         done
 
