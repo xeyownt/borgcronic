@@ -221,10 +221,13 @@ install_linux_conf()
 
 		## EXCLUDES - optional
 		EXCLUDES='--exclude /var/cache'
+		EXCLUDES+=' --exclude /var/log/journal'
 		EXCLUDES+=' --exclude */.cache'
 		EXCLUDES+=' --exclude *.nobak'
 		EXCLUDES+=' --exclude */xapiandb'
 		EXCLUDES+=' --exclude */.thumbnails'
+		# EXCLUDES+=' --exclude *.vdi'
+		# EXCLUDES+=' --exclude *.vmdk'
 
 		## LOG_FILTER - optional
 		# LOG_FILTER='sed -r "/Permission denied:|Device or resource busy:/d"'
