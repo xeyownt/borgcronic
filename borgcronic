@@ -907,11 +907,15 @@ cmd_install()
     start_logging I
 
     log 0 "[INSTALL] $BASE installed successfully."
-    if [ -e "$BORG_REPO/README" -a -d "$BORG_REPO/data" ]; then
-        log 0 "[INSTALL] Borg repository already initialized. Skipping 'borg init' step..."
+    if [[ $BORG_REPO =~ .*:.* ]]; then
+        log 0 "[INSTALL] Skipping 'borg init' when using ssh."
     else
-        log 0 "[INSTALL] Initializing Borg repository..."
-        do_it ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
+        if [ -e "$BORG_REPO/README" -a -d "$BORG_REPO/data" ]; then
+            log 0 "[INSTALL] Borg repository already initialized. Skipping 'borg init' step..."
+        else
+            log 0 "[INSTALL] Initializing Borg repository..."
+            do_it ${DRYRUN:+echo} borg init -e none :: || die 1 "borg init failed."
+        fi
     fi
 }
 
