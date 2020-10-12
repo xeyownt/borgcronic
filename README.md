@@ -22,7 +22,7 @@ for root.
 
 First create a new ssh key:
 
-    ssh-keygen -t ed25519 -f ~/.ssh/id_25519_borg_$HOSTNAME -N ""
+    ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_borg_$HOSTNAME -N ""
 
 Then we create a new entry in ~/.ssh/config:
 
