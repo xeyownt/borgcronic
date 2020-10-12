@@ -41,6 +41,11 @@ Login into the remote server, and add to `~/.ssh/authorized_keys`:
 
 Again, edit `/path/to/borg`, `<AAAAC....>` and `<root@...>` as necessary. 
 
+We must connect once to add the remote server to `known_hosts`:
+
+    ssh borgbackup
+    <ctrl-C>
+
 Finally, edit `/etc/borgcronic.conf` to use the remote server. `/path/to/borg` must match
 the path specified in file `~/.ssh/authorized_keys` on the server:
 
