@@ -116,7 +116,7 @@ function ssh_gethost()
     if [[ $NAME == */* ]]; then
         echo "localhost"
     else
-        SSH_CONFIG="$(< ~/.ssh/config sed -rn 's/#.*//; s/ +/ /g; s/[hH]ost/host/; s/[nN]ame/name/; /host |hostname/p'|sed -r ':a /host/N; /hostname/!b a; {s/\n *hostname/ hostname/; p; d}')"
+        SSH_CONFIG="$(< ~/.ssh/config sed -rn 's/#.*//; s/\t/ /g; s/ +/ /g; s/[hH]ost/host/; s/[nN]ame/name/; /host |hostname/p'|sed -r ':a /host/N; /hostname/!b a; {s/\n *hostname/ hostname/; p; d}')"
         REMOTE=$(echo "$SSH_CONFIG" | perl -lne 'print for / '"$NAME"' .*hostname +(.*)/g')
         if [ -z "$REMOTE" ]; then
             REMOTE=$NAME
