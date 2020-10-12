@@ -220,7 +220,8 @@ install_linux_conf()
 		DIRS='/home'
 
 		## EXCLUDES - optional
-		EXCLUDES='--exclude */.cache'
+		EXCLUDES='--exclude /var/cache'
+		EXCLUDES+=' --exclude */.cache'
 		EXCLUDES+=' --exclude *.nobak'
 		EXCLUDES+=' --exclude */xapiandb'
 		EXCLUDES+=' --exclude */.thumbnails'
