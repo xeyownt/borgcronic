@@ -12,6 +12,41 @@ After editing the configuration, the daemon must be restarted:
 
     sudo systemctl restart borgcronic
 
+## Configure with remote borg server
+
+In this setup, we connect to a remote borgbackup server through ssh.
+Since borgbackup will run locally as root, we must create a new ssh profile
+for root.
+
+    su -
+
+First create a new ssh key:
+
+    ssh-keygen -t ed25519 -f ~/.ssh/id_25519_borg_$HOSTNAME -N ""
+
+Then we create a new entry in ~/.ssh/config:
+
+    Host borgbackup
+        User           <borg user>
+        HostName       <borg server>
+        IdentityFile   ~/.ssh/id_25519_borg_<hostname>
+
+Replace `<borg_user>`, `<borg_server>` and `<hostname>` as necessary.
+
+We must now add this new ssh key to the remote server. For added security (and in fact
+the whole point of running a borg server), we restrict that ssh key to only run <code>borg serve</code>. 
+Login into the remote server, and add to `~/.ssh/authorized_keys`:
+
+    command="/usr/local/bin/borg serve --restrict-to-path /path/to/borg/" ssh-ed25519 <AAAAC....> <root@...>
+
+Again, edit `/path/to/borg`, `<AAAAC....>` and `<root@...>` as necessary. 
+
+Finally, edit `/etc/borgcronic.conf` to use the remote server. `/path/to/borg` must match
+the path specified in file `~/.ssh/authorized_keys` on the server:
+
+    ## BORG_REPO - mandatory
+    BORG_REPO=borgbackup:/path/to/borg
+
 ## Status
 
     sudo borgcronic last
