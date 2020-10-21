@@ -56,6 +56,10 @@ the path specified in file `~/.ssh/authorized_keys` on the server:
     ## BORG_REPO - mandatory
     BORG_REPO=borgbackup:/path/to/borg
 
+After editing the configuration, the daemon must be restarted:
+
+    sudo systemctl restart borgcronic
+
 ## Status
 
     sudo borgcronic last
