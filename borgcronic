@@ -91,6 +91,11 @@ get_op_timestamp()
     fi
 }
 
+function using_borg_server()
+{
+    [[ $BORG_REPO =~ .*:.* ]]
+}
+
 case $MACHTYPE in 
     *"cygwin") HOST_MACH="cygwin" ;;
     *)         HOST_MACH="linux" ;;
@@ -464,6 +469,7 @@ install_startup()
 
 print_size_summary()
 {
+    using_borg_server && return 0             # No size info available when using borg server
     log 1 "Borg repo: $(sizeof $BORG_REPO)"
     [ -d "$BORG_CACHE_DIR" ] && log 1 "Borg cache: $(sizeof $BORG_CACHE_DIR)"
 }
@@ -911,8 +917,8 @@ cmd_install()
     start_logging I
 
     log 0 "[INSTALL] $BASE installed successfully."
-    if [[ $BORG_REPO =~ .*:.* ]]; then
-        log 0 "[INSTALL] Skipping 'borg init' when using ssh."
+    if using_borg_server; then
+        log 0 "[INSTALL] Skipping 'borg init' when using borg server."
     else
         if [ -e "$BORG_REPO/README" -a -d "$BORG_REPO/data" ]; then
             log 0 "[INSTALL] Borg repository already initialized. Skipping 'borg init' step..."
