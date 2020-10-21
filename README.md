@@ -24,6 +24,10 @@ First create a new ssh key:
 
     ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_borg_$HOSTNAME -N ""
 
+Print the new key that we will add later to server authorized_keys:
+
+    cat ~/.ssh/id_ed25519_borg_$HOSTNAME.pub
+
 Then we create a new entry in ~/.ssh/config:
 
     Host borgbackup
@@ -37,9 +41,9 @@ We must now add this new ssh key to the remote server. For added security (and i
 the whole point of running a borg server), we restrict that ssh key to only run <code>borg serve</code>. 
 Login into the remote server, and add to `~/.ssh/authorized_keys`:
 
-    command="/usr/local/bin/borg serve --restrict-to-path /path/to/borg/" ssh-ed25519 <AAAAC....> <root@...>
+    command="/usr/local/bin/borg serve --restrict-to-path /path/to/borg/" <ssh-ed25519 AAAAC.... root@...>
 
-Again, edit `/path/to/borg`, `<AAAAC....>` and `<root@...>` as necessary. 
+Again, edit `/path/to/borg/` and `<ssh-ed25519 AAAAC.... root@...>` as necessary.
 
 We must connect once to add the remote server to `known_hosts`:
 
