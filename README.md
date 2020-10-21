@@ -29,7 +29,7 @@ Then we create a new entry in ~/.ssh/config:
     Host borgbackup
         User           <borg user>
         HostName       <borg server>
-        IdentityFile   ~/.ssh/id_25519_borg_<hostname>
+        IdentityFile   ~/.ssh/id_ed25519_borg_<hostname>
 
 Replace `<borg_user>`, `<borg_server>` and `<hostname>` as necessary.
 
