@@ -744,7 +744,7 @@ borg_prune()
     # archives of THIS machine. The '{hostname}_' prefix is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machine's archives also.
-    tryborg prune ${DRYRUN:+--dry-run} -v --list \
+    tryborg prune ${DRYRUN:+--dry-run} -v --list --stats \
         :: --prefix '{hostname}_'                \
         --keep-daily=7 --keep-weekly=4 --keep-monthly=6
 }
