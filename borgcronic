@@ -180,7 +180,7 @@ install_logrotate()
         cat > $LOGROTATE <<- __END__
 			$LOGFILE
 			{
-			    rotate 4
+			    rotate 8
 			    weekly
 			    missingok
 			    notifempty
