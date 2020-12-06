@@ -484,6 +484,9 @@ check_install_and_read_conf()
     # Check install
     [ -e $CONF ] || die 1 "'$CONF' not found. Did you run the install script '$BASE install <REPOSITORY>'"
 
+    DATE_CONF=$(stat -c %y "$CONF")
+    [ -n "$LAST_DATE_CONF" -a "$LAST_DATE_CONF" != "$DATE_CONF" ] && log 1 "Config file changed."
+
     # Read conf
     BORG_REPO=
     DIRS=
@@ -506,6 +509,8 @@ check_install_and_read_conf()
     # Check conf
     [ -n "$BORG_REPO" ] || die 1 "BORG_REPO not defined or empty in '$CONF'."
     [ -n "$DIRS" ]       || die 1 "DIRS not defined or empty in '$CONF'."
+
+    LAST_DATE_CONF=$DATE_CONF
 }
 
 usage_help()
@@ -829,6 +834,9 @@ cmd_daemon()
         read R <$FIFOFILE                                   # Get next request
         syslog "[daemon] Got '$R' signal."
         [ -z "${IGNORE[$R]}" ] || continue                  # Skip request if in the ignore list
+
+        # Read and check configuration
+        check_install_and_read_conf
 
         case "$R" in
             B)
