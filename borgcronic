@@ -768,7 +768,7 @@ lock_get()
     trap 'trap - INT TERM EXIT; syslog "[daemon] exorcized..."; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
 }
 
-execute-backup()
+execute_backup()
 {
     # Print log header
     print_log_header
@@ -776,7 +776,7 @@ execute-backup()
     borg_create && borg_prune
 }
 
-execute-last()
+execute_last()
 {
     # Print log header
     print_log_header
@@ -799,7 +799,7 @@ cmd_backup()
 
     start_logging B                                         # Start logging
 
-    execute-backup
+    execute_backup
 
     # Release the lock - On SIGINT / SIGTERM / SIGEXIT
 }
@@ -830,10 +830,10 @@ cmd_daemon()
 
         case "$R" in
             B)
-                execute-backup
+                execute_backup
                 ;;
             L)
-                execute-last
+                execute_last
                 ;;
         esac
 
@@ -867,7 +867,7 @@ cmd_devil()
             fi
         fi
 
-        execute-backup
+        execute_backup
 
         set_op_timestamp $CMD
     done
