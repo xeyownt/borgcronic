@@ -60,6 +60,8 @@ After editing the configuration, the daemon must be restarted:
 
     sudo systemctl restart borgcronic
 
+See also Borg documentation for [SSH config tips](https://borgbackup.readthedocs.io/en/stable/usage/serve.html).
+
 ## Status
 
     sudo borgcronic last
