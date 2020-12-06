@@ -765,7 +765,9 @@ lock_get()
     done
 
     echo $BASHPID > $PIDFILE
-    trap 'trap - INT TERM EXIT; syslog "[daemon] exorcized..."; rm -rf "$LOCKDIR"; exit $?' INT TERM EXIT
+    trap 'trap - INT TERM EXIT; syslog "[daemon] Exorcized by INT signal..."; rm -rf "$LOCKDIR"; exit $?' INT
+    trap 'trap - INT TERM EXIT; syslog "[daemon] Exorcized by TERM signal..."; rm -rf "$LOCKDIR"; exit $?' TERM
+    trap 'trap - INT TERM EXIT; syslog "[daemon] Exorcized by EXIT signal..."; rm -rf "$LOCKDIR"; exit $?' EXIT
 }
 
 execute_backup()
