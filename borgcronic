@@ -892,7 +892,9 @@ cmd_install()
         [ -n "$BORG_REPO" ] || die 1 "No BORG_REPO found in '$CONF'. Please delete it and restart.'"
     fi
 
-    mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
+    if !using_borg_server; then
+        mkdir -p $BORG_REPO || die 1 "Cannot create repository dir '$BORG_REPO'"
+    fi
 
     # Install configuration and scripts files
     if [ "$OS" = "Windows_NT" ]; then
