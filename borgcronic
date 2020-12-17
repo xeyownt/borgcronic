@@ -545,8 +545,8 @@ The commands are:
     last
         Print a summary of last archives found in the repository for each host.
 
-    perf
-        Print some statistics on performance.
+    stats
+        Print some statistics on performance and archive size.
 
     summon
     summon-backup
@@ -594,7 +594,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install [REPOSITORY]|last|perf|summon|summon-backup|summon-last"$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install [REPOSITORY]|last|stats|summon|summon-backup|summon-last"$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -636,7 +636,7 @@ read_options()
             INSTALL_ARG=$2
             VERBOSE=1
             ;;
-        backup|devil|daemon|summon|summon-backup|summon-last|perf)
+        backup|devil|daemon|summon|summon-backup|summon-last|stats)
             ;;
         *)
             die 1 "$usage"
@@ -959,12 +959,11 @@ cmd_last()
         | sed -r '/^---/{s/_.*//; s/^|$/\n/g; b}; s/\[.*//'
 }
 
-cmd_perf()
+cmd_stats()
 {
     F=
     for ext in "" .1 .{2,3,4,5,6,7,8,9}.gz; do [ -e $LOGFILE$ext ] && F="$LOGFILE$ext $F"; done
-    echo $F
-    zgrep -hE "^(Duration|Time \(start\)).*" $F
+    zgrep -hE "^(Duration|Time \(start\)|This archive:).*" $F
 }
 
 cmd_summon-backup()
@@ -1017,8 +1016,8 @@ case $MODE in
     last)
         cmd_last "$@"
         ;;
-    perf)
-        cmd_perf "$@"
+    stats)
+        cmd_stats "$@"
         ;;
     summon | summon-backup)
         cmd_summon-backup "$@"
