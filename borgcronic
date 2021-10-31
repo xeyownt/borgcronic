@@ -536,6 +536,9 @@ The commands are:
         Run borg, passing the remaining parameters on the line
         to borg. This is handy to run borg using $BASE configuration.
 
+    extract ARCHIVE [path...]
+        Extract give path from backup ARCHIVE.
+
     install [REPOSITORY]
         Install $BASE, configuration and script files, then run
         borg to initialize REPOSITORY. Use -f to force overwriting
@@ -544,6 +547,9 @@ The commands are:
 
     last
         Print a summary of last archives found in the repository for each host.
+
+    list
+        List available backup archives.
 
     stats
         Print some statistics on performance and archive size.
@@ -594,7 +600,7 @@ read_options()
     FORCE=
 
     local OPTIONS="dfhv"
-    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec ...|install [REPOSITORY]|last|stats|summon|summon-backup|summon-last"$'\n'"Type '$BASE -h' for help."
+    local usage="Usage: $BASE [-$OPTIONS] backup|daemon|devil|exec|extract|install|last|list|stats|summon|summon-backup|summon-last [OPTIONS...]"$'\n'"Type '$BASE -h' for help."
     while getopts "$OPTIONS" flag; do
         case "$flag" in
             d)
@@ -629,7 +635,7 @@ read_options()
 
     # Process command
     case "$MODE" in
-        exec|last)
+        exec|last|list|extract)
             VERBOSE=1
             ;;
         install)
@@ -889,6 +895,14 @@ cmd_exec()
     borg ${DRYRUN:+--dry-run} "$@"
 }
 
+cmd_extract()
+{
+    [ -n "$1" ] || die 1 "ARCHIVE parameter missing."
+    ARCHIVE=$1
+    shift
+    borg ${DRYRUN:+--dry-run} extract "$BORG_REPO::$ARCHIVE" "$@"
+}
+
 cmd_install()
 {
     log 0 "[INSTALL] Installing $BASE."
@@ -1010,11 +1024,17 @@ case $MODE in
     exec)
         cmd_exec "$@"
         ;;
+    extract)
+        cmd_extract "$@"
+        ;;
     install)
         cmd_install "$@"
         ;;
     last)
         cmd_last "$@"
+        ;;
+    list)
+        cmd_exec list "$@"
         ;;
     stats)
         cmd_stats "$@"

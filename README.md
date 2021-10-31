@@ -10,7 +10,6 @@ Install borg
 Install borgcronic
 
     sudo ./borgcronic install /smb/borgserver/repo      # Local
-
 Edit file `/etc/borgcronic.conf`. After editing the configuration, restart borgcronic daemon.
 
     sudo systemctl restart borgcronic
@@ -82,9 +81,13 @@ See also Borg documentation for [SSH config tips](https://borgbackup.readthedocs
 
 ## View available archives
 
-    sudo borgcronic exec list
+    sudo borgcronic list
+    # ...
+    # machine_20190101_1234             Sun, 2019-01-01 12:34:40 [589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2]
+    # machine_20190102_1234             Sun, 2019-01-02 12:34:32 [163ad79628449681a7af3f8ac4a81d972f7df6e372062e904a0c7874d65c6322]
 
 ## Extract an archive
 
-    # Note: path DO NOT start with a trailing /
-    sudo borgcronic exec extract /my/path/to/borg::machine_20190101_1234 home/myuser
+    # sudo borgcronic ARCHIVE [PATH...]
+    # Note: PATH *DO NOT* start with a trailing /
+    sudo borgcronic extract machine_20190102_1234 home/myuser
